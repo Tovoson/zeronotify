@@ -9,12 +9,37 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - zeronotify
+      - smpp-network
     volumes:
       - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  kannel:
+    image: bulktrade/kannel:r5173 # ← Changer r5159 en r5173
+    container_name: my_kannel
+    restart: unless-stopped
+    ports:
+      - "13013:13013"
+      - "13000:13000"
+      - "13001:13001"
+    networks:
+      - smpp-network
+    volumes:
+      - ./config/kannel.conf:/etc/kannel/kannel.conf
+
+  smpp-server:
+    build: ./server
+    ports:
+      - "2775:2775" # Exposition pour tests externes
+    networks:
+      - smpp-network
+    environment:
+      - SMPP_PORT=2775
+      - SMPP_DEBUG=true
+    restart: unless-stopped
 
 networks:
-  zeronotify:
+  smpp-network:
     driver: bridge
 
 volumes:
