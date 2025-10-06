@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: db_service
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: zeronotify_db
+    ports:
+      - "5432:5432"
+    networks:
+      - zeronotify
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+networks:
+  zeronotify:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local

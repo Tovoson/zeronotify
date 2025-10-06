@@ -1,0 +1,1 @@
+export const key_jwt = 'rfdsgdfgfdgdfgdfgdf'
