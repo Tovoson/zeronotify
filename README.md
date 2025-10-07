@@ -4,10 +4,10 @@ Run backend project:
    
 Raha base de données en local :
  - cd backend 
- miditra variable d'environnement .env
+ - miditra variable d'environnement .env
  de soloana DOCKER = false
 
 Rah base de données dans docker :
-- cde backend
-miditra variable d'environnement .env
+- cd backend
+- miditra variable d'environnement .env
  de soloana DOCKER = true
