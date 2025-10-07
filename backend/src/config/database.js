@@ -5,7 +5,7 @@ dotenv.config();
 
 const env = process.env.NODE_ENV || "development";
 const isDocker =
-  process.env.DOCKER === "true" || process.env.IS_DOCKER === "true";
+  process.env.DOCKER === "false" || process.env.IS_DOCKER === "true";
 
 const config = {
   development: {
