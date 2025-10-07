@@ -1,4 +1,5 @@
 import Sms from "../models/Sms.models.js";
+import testSMS from "../service/connect.js";
 
 /**
  * Envoyer un SMS et le stocker dans la base de données
@@ -45,7 +46,8 @@ export const send_sms = async (req, res) => {
     try {
       // TODO: Intégrer l'API d'envoi SMS réelle (Twilio, Vonage, etc.)
       // await apiSmsProvider.send({ to: destinataire, from: expediteur, body: contenu });
-
+      // const resp = await testSMS(expediteur, destinataire, contenu);
+      // console.log(resp);
       // Simuler un délai d'envoi
       //   await new Promise((resolve) => setTimeout(resolve, 500));
 

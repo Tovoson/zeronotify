@@ -3,7 +3,7 @@ import { login, signUp } from "../controller/auth.controller.js";
 
 const router = express.Router();
 
-router.post("/signup", signUp); //http://localhost:5000/api/auth/signup
-router.post("/login", login);   //http://localhost:5000/api/auth/login
+router.post("/signup", signUp); //http://localhost:3000/zeronotify/auth/signup
+router.post("/login", login);   //http://localhost:3000/zeronotify/auth/login
 
 export default router;
