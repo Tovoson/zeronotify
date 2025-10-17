@@ -30,7 +30,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// Sample route
+// Sample routes
 app.use("/zeronotify/auth", authRouter);
 app.use("/zeronotify/sms", smsRouter);
 
