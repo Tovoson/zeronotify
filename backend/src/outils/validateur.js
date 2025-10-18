@@ -5,7 +5,7 @@ export const validerPhone = (destinataire) => {
       return {
         success: false,
         message:
-          "Le numéro de téléphone doit être au format Madagascar (+261XXXXXXXXX)",
+          "Le numéro de téléphone doit être au format (+261XXXXXXXXX)",
         example: "+26134XXXXXXX",
       };
     }

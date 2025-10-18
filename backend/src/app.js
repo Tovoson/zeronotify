@@ -51,6 +51,10 @@ app.use((req, res, next) => {
   });
 });
 
+/**
+ * 
+ 
+
 const envoyer = await envoyerSMS("+261348143958", "Hello from ZeroNotify!");
 const smsNonTraites = await getSMSNonTraites();
 //marquerCommeTraite(8);
@@ -65,6 +69,8 @@ console.log("statistiques", statistiques);
 //exempleUtilisation();
 
 console.log(envoyer);
+
+*/
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}/`);
