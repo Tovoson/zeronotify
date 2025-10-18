@@ -10,6 +10,7 @@ import contactRouter from "./routes/contact.routes.js";
 import templateRouter from "./routes/template.routes.js";
 //
 import { exempleUtilisation } from "./test.js";
+import { envoyerSMS, getHistoriqueEnvois, getSMSNonTraites, getStatistiquesModem, marquerCommeTraite } from "./test_gammu_pg.js";
 
 dotenv.config();
 const app = express();
@@ -50,7 +51,20 @@ app.use((req, res, next) => {
   });
 });
 
+const envoyer = await envoyerSMS("+261348143958", "Hello from ZeroNotify!");
+const smsNonTraites = await getSMSNonTraites();
+//marquerCommeTraite(8);
+const historique = await getHistoriqueEnvois("+261348143958", 10);
+const statistiques = await getStatistiquesModem();
+
+console.log("SMS non traités", smsNonTraites);
+console.log("historique", historique);
+console.log("statistiques", statistiques);
+
+
 //exempleUtilisation();
+
+console.log(envoyer);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}/`);

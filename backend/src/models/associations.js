@@ -2,9 +2,6 @@ import Contact from "./contact.models.js";
 import Sms from "./sms.models.js";
 import TemplateSMS from "./template_sms.models.js";
 import Utilisateur from "./utilisateur.models.js";
-import Inbox from "./models_for_gsm/inbox.js";
-import Outbox from "./models_for_gsm/outbox.js";
-import SentItems from "./models_for_gsm/sentitems.js";
 
 // ========== Utilisateur <-> Contact (1 à n) ==========
 Utilisateur.hasMany(Contact, {

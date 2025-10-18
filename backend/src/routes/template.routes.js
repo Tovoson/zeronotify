@@ -1,5 +1,5 @@
 import express from "express";
-import { creerTemplate, listerTemplates } from "../controller/template.controller";
+import { creerTemplate, getTemplateById, listerTemplates, mettreAJourTemplate, supprimerTemplate } from "../controller/template.controller.js";
 
 const router = express.Router();
 

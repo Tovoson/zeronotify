@@ -1,98 +1,91 @@
+import Outbox from "../models/gammu/outbox.js";
 import Sms from "../models/sms.models.js"
-import { validerPhone } from "../routes/outils/validateur.js";
+import { validerPhone } from "../outils/validateur.js";
 import testSMS from "../service/connect.js";
 
 /**
  * Envoyer un SMS et le stocker dans la base de données
  */
 export const send_sms = async (req, res) => {
-  try {
-    
-    // Validation des données requises
-    const { expediteur, destinataire, contenu } = req.body;
+  let nouveauSms; // Déclaré en dehors du try pour être accessible en cas d'erreur BDD
 
+  try {
+    // 1. Validation des données requises (Inchangé)
+    const { expediteur, destinataire, contenu } = req.body;
+    const expediteurId = req.userId; // Supposons que l'ID de l'utilisateur est dans le token
+
+    // Remarque: Les validateurs validerSms et validerPhone ne sont pas définis ici.
     const smsValidation = validerSms(expediteur, destinataire, contenu);
     if (!smsValidation.success) {
       return res.status(400).json(smsValidation);
     }
-
     const validationResponse = validerPhone(destinataire);
     if (!validationResponse.success) {
       return res.status(400).json(validationResponse);
     }
 
-    // Création du SMS en base de données avec statut "en_attente"
-    const nouveauSms = await Sms.create({
+    // 2. Création du SMS en base de données de suivi (votre table 'Sms')
+    // Le statut est 'en_attente' car Gammu ne l'a pas encore pris en charge.
+    nouveauSms = await Sms.create({
       expediteur,
       destinataire,
       contenu,
       statut: "en_attente",
       dateEnvoi: null,
+      // Lier à l'utilisateur actuel
+      utilisateurId: expediteurId, 
     });
 
-    // Simulation de l'envoi du SMS
+    // ----------------------------------------------------------------------
+    // 3. INTÉGRATION GAMMU SMSD : Insertion dans la file d'attente Outbox
+    // ----------------------------------------------------------------------
     try {
-      // TODO: Intégrer l'API d'envoi SMS réelle (Twilio, Vonage, etc.)
-      // await apiSmsProvider.send({ to: destinataire, from: expediteur, body: contenu });
-      // const resp = await testSMS(expediteur, destinataire, contenu);
-      // console.log(resp);
-      // Simuler un délai d'envoi
-      //   await new Promise((resolve) => setTimeout(resolve, 500));
+      await Outbox.create({
+        // Le numéro de destination pour le modem
+        DestinationNumber: destinataire, 
+        // Le contenu du message
+        TextDecoded: contenu,
+        // Liaison avec votre modèle de suivi (le lien est l'ID du message de suivi)
+        CreatorID: String(nouveauSms.id), 
+        // L'encodage par défaut
+        Coding: 'Default',
+        // Planification immédiate
+        RelativeValidity: -1, 
+      });
 
-      // Mettre à jour le statut à "envoye"
-      nouveauSms.statut = "envoye";
-      nouveauSms.dateEnvoi = new Date();
+      // Le message est soumis. On met à jour le statut dans votre table de suivi.
+      // Le statut "soumis" indique que Gammu devrait le prendre en charge.
+      nouveauSms.statut = "soumis_gammu"; 
       await nouveauSms.save();
-
-      return res.status(200).json({
+      
+      // Réponse immédiate au client (statut 202 Accepted recommandé pour les tâches en arrière-plan)
+      return res.status(202).json({
         success: true,
-        message: "SMS envoyé avec succès",
+        message: "SMS soumis à la file d'attente Gammu SMSD. Envoi en cours...",
         data: {
           id: nouveauSms.id,
-          expediteur: nouveauSms.expediteur,
           destinataire: nouveauSms.destinataire,
           statut: nouveauSms.statut,
-          dateEnvoi: nouveauSms.dateEnvoi,
         },
       });
-    } catch (sendError) {
-      // En cas d'échec de l'envoi, mettre à jour le statut à "echec"
-      nouveauSms.statut = "echec";
+
+    } catch (gammuError) {
+      // Échec de l'insertion dans la table Outbox (Problème BDD ou schéma)
+      
+      // Mettre à jour le statut dans votre table de suivi à "echec_soumission"
+      nouveauSms.statut = "echec_soumission";
       await nouveauSms.save();
 
+      console.error("Erreur d'insertion Outbox (Gammu SMSD):", gammuError);
       return res.status(500).json({
         success: false,
-        message: "Échec de l'envoi du SMS",
-        error: sendError.message,
-        data: {
-          id: nouveauSms.id,
-          statut: nouveauSms.statut,
-        },
+        message: "Échec de la soumission du SMS à Gammu (Erreur BDD Outbox).",
+        error: gammuError.message,
+        data: { id: nouveauSms.id, statut: nouveauSms.statut },
       });
     }
   } catch (error) {
-    // Gestion des erreurs de validation Sequelize
-    if (error.name === "SequelizeValidationError") {
-      return res.status(400).json({
-        success: false,
-        message: "Erreur de validation des données",
-        errors: error.errors.map((e) => ({
-          field: e.path,
-          message: e.message,
-        })),
-      });
-    }
-
-    // Gestion des erreurs de base de données
-    if (error.name === "SequelizeDatabaseError") {
-      return res.status(500).json({
-        success: false,
-        message: "Erreur de base de données",
-        error: error.message,
-      });
-    }
-
-    // Erreur générique
+    
     console.error("Erreur lors de l'envoi du SMS:", error);
     return res.status(500).json({
       success: false,

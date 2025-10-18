@@ -1,4 +1,4 @@
-import TemplateSMS from "../models/template_sms.models";
+import TemplateSMS from "../models/template_sms.models.js";
 
 export const creerTemplate = async (req, res) => {
   try {
