@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import morgan from "morgan";
 import bodyParser from "body-parser";
 import cors from "cors";
+import syncDatabase from "./config/syncDatabase.js";
 
 dotenv.config();
 const app = express();
@@ -29,6 +30,8 @@ app.get("/", (req, res) => {
     message: "APIs en marche",
   });
 });
+
+await syncDatabase();
 
 // Sample routes
 app.use("/zeronotify/auth", authRouter);

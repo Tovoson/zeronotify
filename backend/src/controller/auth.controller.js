@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { ValidationError, UniqueConstraintError } from "@sequelize/core";
-import Admin from "../models/admin.models.js";
+import Admin from "../models/utilisateur.models.js";
 import jwt from "jsonwebtoken";
 import { key_jwt } from "../lib/key_jwt.js";
 

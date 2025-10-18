@@ -16,22 +16,7 @@ const config = {
     port: process.env.DB_PORT || 5432,
     dialect: "postgres",
   },
-  // test: {
-  //   user: process.env.DB_USER || "admin",
-  //   password: process.env.DB_PASSWORD || "admin",
-  //   database: process.env.DB_NAME || "zeronotify_db",
-  //   host: isDocker ? process.env.DB_HOST || "postgres" : "127.0.0.1",
-  //   port: process.env.DB_PORT || 5432,
-  //   dialect: "postgres"
-  // },
-  // production: {
-  //   username: process.env.DB_USER || "admin",
-  //   password: process.env.DB_PASSWORD || "admin",
-  //   database: process.env.DB_NAME || "zeronotify_db",
-  //   host: isDocker ? process.env.DB_HOST || "postgres" : "127.0.0.1",
-  //   port: process.env.DB_PORT || 5432,
-  //   dialect: "postgres"
-  // }
+  
 };
 
 const sequelize = new Sequelize(config[env]);

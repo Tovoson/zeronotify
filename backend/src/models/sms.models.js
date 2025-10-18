@@ -17,12 +17,12 @@ const Sms = sequelize.define("Sms", {
       },
     },
   },
-  destinataire: {
-    type: DataTypes.STRING,
+  destinataires: {
+    type: DataTypes.JSON, // Array de strings
     allowNull: false,
     validate: {
       notEmpty: {
-        msg: "Le destinataire ne peut pas être vide",
+        msg: "Les destinataires ne peuvent pas être vides",
       },
     },
   },
@@ -50,6 +50,36 @@ const Sms = sequelize.define("Sms", {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  date_planifiee: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  total: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  envoyes: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  echecs: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  type: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: "simple",
+    validate: {
+      isIn: {
+        args: [["simple", "groupe", "planifie"]],
+        msg: "Le type doit être: simple, groupe ou planifie",
+      },
+    },
+  },
   createdAt: {
     allowNull: false,
     type: DataTypes.DATE,
@@ -62,27 +92,5 @@ const Sms = sequelize.define("Sms", {
   tableName: "Sms",
   timestamps: true,
 });
-
-// Méthodes d'instance
-// Sms.prototype.envoyer = function() {
-//   this.statut = "envoye";
-//   this.dateEnvoi = new Date();
-//   return this.save();
-// };
-
-// MessageSMS.prototype.getStatut = function() {
-//   return this.statut;
-// };
-
-// MessageSMS.prototype.historique = function() {
-//   return {
-//     id: this.id,
-//     expediteur: this.expediteur,
-//     destinataire: this.destinataire,
-//     statut: this.statut,
-//     dateEnvoi: this.dateEnvoi,
-//     createdAt: this.createdAt,
-//   };
-// };
 
 export default Sms;

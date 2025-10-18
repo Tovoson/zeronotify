@@ -1,4 +1,4 @@
-import Sms from "../models/Sms.models.js";
+import Sms from "../models/sms.models.js"
 import testSMS from "../service/connect.js";
 
 /**
