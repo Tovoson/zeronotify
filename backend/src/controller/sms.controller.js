@@ -1,4 +1,5 @@
 import Sms from "../models/sms.models.js"
+import { validerPhone } from "../routes/outils/validateur.js";
 import testSMS from "../service/connect.js";
 
 /**
@@ -6,31 +7,18 @@ import testSMS from "../service/connect.js";
  */
 export const send_sms = async (req, res) => {
   try {
+    
     // Validation des données requises
     const { expediteur, destinataire, contenu } = req.body;
 
-    if (!expediteur || !destinataire || !contenu) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Les champs expediteur, destinataire et contenu sont obligatoires",
-        errors: {
-          expediteur: !expediteur ? "L'expéditeur est requis" : null,
-          destinataire: !destinataire ? "Le destinataire est requis" : null,
-          contenu: !contenu ? "Le contenu est requis" : null,
-        },
-      });
+    const smsValidation = validerSms(expediteur, destinataire, contenu);
+    if (!smsValidation.success) {
+      return res.status(400).json(smsValidation);
     }
 
-    const phoneRegex = /^\+261[0-9]{9}$/;
-
-    if (!phoneRegex.test(destinataire)) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Le numéro de téléphone doit être au format Madagascar (+261XXXXXXXXX)",
-        example: "+26134XXXXXXX",
-      });
+    const validationResponse = validerPhone(destinataire);
+    if (!validationResponse.success) {
+      return res.status(400).json(validationResponse);
     }
 
     // Création du SMS en base de données avec statut "en_attente"

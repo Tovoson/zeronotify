@@ -1,5 +1,6 @@
 import { sequelize } from "../config/database.js";
 import { DataTypes } from "@sequelize/core";
+import Utilisateur from "./utilisateur.models.js";
 
 const TemplateSMS = sequelize.define("TemplateSMS", {
   id: {
@@ -30,6 +31,14 @@ const TemplateSMS = sequelize.define("TemplateSMS", {
     type: DataTypes.JSON,
     allowNull: true,
     defaultValue: [],
+  },
+  utilisateur_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Utilisateur,
+      key: "id",
+    },
   },
   createdAt: {
     allowNull: false,

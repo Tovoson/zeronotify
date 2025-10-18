@@ -7,6 +7,8 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import syncDatabase from "./config/syncDatabase.js";
 import contactRouter from "./routes/contact.routes.js";
+import templateRouter from "./routes/template.routes.js";
+//
 import { exempleUtilisation } from "./test.js";
 
 dotenv.config();
@@ -39,6 +41,7 @@ await syncDatabase();
 app.use("/zeronotify/auth", authRouter);
 app.use("/zeronotify/sms", smsRouter);
 app.use("/zeronotify/contact", contactRouter);
+app.use("/zeronotify/template", templateRouter);
 
 app.use((req, res, next) => {
   res.status(404).json({

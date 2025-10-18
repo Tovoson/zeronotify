@@ -1,43 +1,37 @@
 import Contact from "../models/contact.models.js";
 
-export const creerContact = async (req, res) => {
-  try {
-    const { nom, numero, utilisateurId } = req.body;
-
-    // Validation des champs
-    if (!nom || !numero || !utilisateurId) {
-      return res.status(400).json({
-        status: "fail",
-        message: "Tous les champs sont requis",
+export const creerCampagneContacts = async (req, res) => {
+    try {
+      const { contacts, utilisateurId } = req.body;
+  
+      // Validation des champs
+      if (!contacts || !Array.isArray(contacts) || contacts.length === 0 || !utilisateurId) {
+        return res.status(400).json({
+          status: "fail",
+          message: "Tous les champs sont requis et contacts doit être un tableau non vide",
+        });
+      }
+  
+      // Préparation des données pour bulkCreate
+      const contactsData = contacts.map(contact => ({
+        nom: contact.nom,
+        telephone: contact.numero,
+        utilisateur_id: utilisateurId,
+      }));
+  
+      // Création des contacts en masse
+      const createdContacts = await Contact.bulkCreate(contactsData);
+  
+      const message = "Campagne de contacts créée avec succès";
+      return res.status(201).json({ message, data: createdContacts });
+    } catch (error) {
+      console.error("Erreur lors de la création de la campagne de contacts:", error);
+      return res.status(500).json({
+        message: "La campagne de contacts n'a pas pu être créée, réessayez dans un instant",
+        error: error.message,
       });
     }
-
-    // Création du contact
-    const contact = await Contact.bulkCreate([{
-      nom: nom,
-      telephone: numero,
-      utilisateur_id: utilisateurId,
-    }]);
-
-    const message = "Contact créé avec succès";
-    return res.status(201).json({ message, data: contact });
-  } catch (error) {
-    // Gestion des erreurs de validation
-    if (error instanceof ValidationError) {
-      return res.status(400).json({
-        message: "Erreur de validation",
-        errors: error.errors.map((e) => e.message),
-      });
-    }
-
-    // Erreur générale
-    console.error("Erreur lors de la création du contact:", error);
-    return res.status(500).json({
-      message: "Le contact n'a pas pu être créé, réessayez dans un instant",
-      error: error.message,
-    });
-  }
-};
+  };
 
 export const listerContacts = async (req, res) => {
 
