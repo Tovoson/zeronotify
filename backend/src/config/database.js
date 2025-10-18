@@ -33,19 +33,8 @@ const testConnection = () =>
       console.error(`❌ Unable to connect to the ${env} database:`, error)
     );
 
-const initDb = async () => {
-  try {
-    const _ = await sequelize.sync({ force: false });
-
-    console.log("La base de données Sms a été migrée avec succès.");
-  } catch (error) {
-    return console.log(`erreur de migration : ${error}`);
-  }
-};
-
 if (env !== "test") {
   testConnection();
-  initDb();
 }
 
 export { sequelize };

@@ -8,7 +8,7 @@ const syncDatabase = async () => {
     console.log("Base de données synchronisée avec succès");
 
     // Option 2: Pour le développement - réinitialise toutes les tables
-     await sequelize.sync({ force: true });
+     await sequelize.sync({ force: false });
     // console.log("Base de données réinitialisée avec succès");
   } catch (error) {
     console.error("Erreur lors de la synchronisation:", error);

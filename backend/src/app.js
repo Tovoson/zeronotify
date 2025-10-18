@@ -6,6 +6,8 @@ import morgan from "morgan";
 import bodyParser from "body-parser";
 import cors from "cors";
 import syncDatabase from "./config/syncDatabase.js";
+import contactRouter from "./routes/contact.routes.js";
+import { exempleUtilisation } from "./test.js";
 
 dotenv.config();
 const app = express();
@@ -36,6 +38,7 @@ await syncDatabase();
 // Sample routes
 app.use("/zeronotify/auth", authRouter);
 app.use("/zeronotify/sms", smsRouter);
+app.use("/zeronotify/contact", contactRouter);
 
 app.use((req, res, next) => {
   res.status(404).json({
@@ -43,6 +46,8 @@ app.use((req, res, next) => {
     message: "Route inexistante",
   });
 });
+
+//exempleUtilisation();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}/`);

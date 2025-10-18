@@ -1,15 +1,15 @@
 import bcrypt from "bcrypt";
 import { ValidationError, UniqueConstraintError } from "@sequelize/core";
-import Admin from "../models/utilisateur.models.js";
+import Utilisateur from "../models/utilisateur.models.js";
 import jwt from "jsonwebtoken";
 import { key_jwt } from "../lib/key_jwt.js";
 
 const signUp = async (req, res) => {
   try {
-    const { nom, email, password, entreprise } = req.body;
+    const { nom, email, mot_de_passe, entreprise } = req.body;
 
     // Validation des champs
-    if (!nom || !email || !password || !entreprise) {
+    if (!nom || !email || !mot_de_passe || !entreprise) {
       return res.status(400).json({
         status: "fail",
         message: "Tous les champs sont requis",
@@ -17,10 +17,10 @@ const signUp = async (req, res) => {
     }
 
     // Hashage du mot de passe
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(mot_de_passe, 10);
 
     // Création de l'utilisateur
-    const user = await Admin.create({
+    const user = await Utilisateur.create({
       nom: nom,
       email: email,
       mot_de_passe: hash,
@@ -57,10 +57,10 @@ const signUp = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, mot_de_passe } = req.body;
 
     // Validation des champs
-    if (!email || !password) {
+    if (!email || !mot_de_passe) {
       return res.status(400).json({
         status: "fail",
         message: "Tous les champs sont requis",
@@ -68,7 +68,7 @@ const login = async (req, res) => {
     }
 
     // Recherche de l'utilisateur
-    const user = await Admin.findOne({ where: { email: email } });
+    const user = await Utilisateur.findOne({ where: { email: email } });
 
     if (!user) {
       return res.status(404).json({
@@ -77,7 +77,7 @@ const login = async (req, res) => {
     }
 
     // Vérification du mot de passe
-    const isPasswordValid = await bcrypt.compare(password, user.mot_de_passe);
+    const isPasswordValid = await bcrypt.compare(mot_de_passe, user.mot_de_passe);
 
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -85,12 +85,14 @@ const login = async (req, res) => {
       });
     }
 
-    // Vérification si le compte est actif
+    // Vérification si le compte est actif, il faut encore ajouter une table status dans utiliser
+    /**
     if (!user.active) {
       return res.status(403).json({
         message: "Compte désactivé",
       });
     }
+    */
 
     // Génération du token JWT
     const token = jwt.sign(
