@@ -89,6 +89,12 @@ const Phones = sequelize.define("Phones", {
     defaultValue: 0,
     field: "Received",
   },
+  State: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    defaultValue: 'Unknown',
+    field: "State",
+  },
 }, {
   tableName: "phones",
   timestamps: false,

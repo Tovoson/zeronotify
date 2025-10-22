@@ -16,6 +16,7 @@ export const creerCampagneContacts = async (req, res) => {
       const contactsData = contacts.map(contact => ({
         nom: contact.nom,
         telephone: contact.numero,
+        groupe: contact.groupe,
         utilisateur_id: utilisateurId,
       }));
   

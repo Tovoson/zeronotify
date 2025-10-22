@@ -41,8 +41,8 @@ const Sms = sequelize.define("Sms", {
     defaultValue: "en_attente",
     validate: {
       isIn: {
-        args: [["en_attente", "envoye", "delivre", "echec"]],
-        msg: "Le statut doit être: en_attente, envoye, delivre ou echec",
+        args: [["en_attente", "envoye", "planifie", "delivre", "echec"]],
+        msg: "Le statut doit être: en_attente, envoye, planifie, delivre ou echec",
       },
     },
   },

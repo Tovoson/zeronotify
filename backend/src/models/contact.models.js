@@ -27,6 +27,17 @@ const Contact = sequelize.define("Contact", {
       },
     },
   },
+  groupe: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: "Client",
+    validate: {
+      isIn: {
+        args: [["Partenaires", "Équipe", "Fournisseurs", "Autre"]],
+        msg: "Le groupe doit être: Partenaires, Équipe, Fournisseurs, Autre",
+      },
+    }
+  },
   utilisateur_id: {
     type: DataTypes.INTEGER,
     allowNull: false,

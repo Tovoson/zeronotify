@@ -8,26 +8,42 @@ import cors from "cors";
 import syncDatabase from "./config/syncDatabase.js";
 import contactRouter from "./routes/contact.routes.js";
 import templateRouter from "./routes/template.routes.js";
-//
-import { exempleUtilisation } from "./test.js";
-import { envoyerSMS, getHistoriqueEnvois, getSMSNonTraites, getStatistiquesModem, marquerCommeTraite } from "./test_gammu_pg.js";
+import "./outils/scheduledSmsService.js";
+import http from 'http';
+import { Server } from 'socket.io';
+
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
+process.env.TZ = 'Indian/Antananarivo';
+
+const server = http.createServer(app);
+export const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"]
+  }
+});
+
+const corsOptions = {
+    origin: 'http://localhost:5173', // <-- Autorisez l'origine de votre frontend React
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true, // Autorise les cookies et les en-têtes d'authentification
+    optionsSuccessStatus: 204 // Pour gérer les requêtes preflight (OPTIONS)
+};
 
 app
   .use(morgan("dev"))
   .use(bodyParser.json())
   .use(
-    cors({
-      origin: process.env.CLIENT_URL,
-      credentials: true,
-    })
+    cors(corsOptions)
   )
   .use(bodyParser.urlencoded({ extended: true }));
 
 app.use(express.json());
+
+
 
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -50,27 +66,6 @@ app.use((req, res, next) => {
     message: "Route inexistante",
   });
 });
-
-/**
- * 
- 
-
-const envoyer = await envoyerSMS("+261348143958", "Hello from ZeroNotify!");
-const smsNonTraites = await getSMSNonTraites();
-//marquerCommeTraite(8);
-const historique = await getHistoriqueEnvois("+261348143958", 10);
-const statistiques = await getStatistiquesModem();
-
-console.log("SMS non traités", smsNonTraites);
-console.log("historique", historique);
-console.log("statistiques", statistiques);
-
-
-//exempleUtilisation();
-
-console.log(envoyer);
-
-*/
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}/`);

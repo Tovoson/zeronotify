@@ -1,5 +1,6 @@
 import { sequelize } from "./database.js";
 import { Utilisateur, Contact, TemplateSMS, Sms } from "../models/associations.js";
+import Phones from "../models/gammu/phones.js";
 
 const syncDatabase = async () => {
   try {
