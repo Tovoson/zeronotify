@@ -9,7 +9,7 @@ const TemplateSMS = sequelize.define("TemplateSMS", {
     primaryKey: true,
     type: DataTypes.INTEGER,
   },
-  nom: {
+  nomTemplate: {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
@@ -18,7 +18,7 @@ const TemplateSMS = sequelize.define("TemplateSMS", {
       },
     },
   },
-  contenu: {
+  contenuTemplate: {
     type: DataTypes.TEXT,
     allowNull: false,
     validate: {
@@ -27,10 +27,24 @@ const TemplateSMS = sequelize.define("TemplateSMS", {
       },
     },
   },
-  variables: {
+  variablesTemplate: {
     type: DataTypes.JSON,
     allowNull: true,
     defaultValue: [],
+  },
+  utilisationTemplate: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+  },
+  favoriTemplate: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+  categorieTemplate: {
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   utilisateur_id: {
     type: DataTypes.INTEGER,

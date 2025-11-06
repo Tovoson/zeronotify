@@ -1,6 +1,5 @@
 import { sequelize } from "./database.js";
 import { Utilisateur, Contact, TemplateSMS, Sms } from "../models/associations.js";
-import Phones from "../models/gammu/phones.js";
 
 const syncDatabase = async () => {
   try {
@@ -12,7 +11,7 @@ const syncDatabase = async () => {
      await sequelize.sync({ force: false });
     // console.log("Base de données réinitialisée avec succès");
   } catch (error) {
-    console.error("Erreur lors de la synchronisation:", error);
+    console.error("Erreur lors de la synchronisation :", error);
   }
 };
 

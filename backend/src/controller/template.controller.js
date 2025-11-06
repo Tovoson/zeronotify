@@ -2,22 +2,26 @@ import TemplateSMS from "../models/template_sms.models.js";
 
 export const creerTemplate = async (req, res) => {
   try {
-    const { nom, contenu, variables, utilisateurId } = req.body;
+    const { nomTemplate, contenuTemplate, variablesTemplate, categorieTemplate } = req.body;
+    const utilisateurId = req.user.userId;
+
+    console.log("Données reçues pour la création du template:", req.body); // Debug
 
     // Validation des champs
-    if (!nom || !contenu || !utilisateurId) {
+    if (!nomTemplate || !contenuTemplate || !utilisateurId) {
       return res.status(400).json({
         status: "fail",
         message: "Le nom, le contenu et l'utilisateur sont requis",
       });
     }
-
+    
     // Création du template
     const newTemplate = await TemplateSMS.create({
-      nom,
-      contenu,
-      variables: variables || [], // Utiliser un tableau vide par défaut
+      nomTemplate: nomTemplate,
+      contenuTemplate: contenuTemplate,
+      variablesTemplate: variablesTemplate || [], // Utiliser un tableau vide par défaut
       utilisateur_id: utilisateurId,
+      categorieTemplate: categorieTemplate || null,
     });
 
     return res.status(201).json({
@@ -36,7 +40,9 @@ export const creerTemplate = async (req, res) => {
 };
 
 export const listerTemplates = async (req, res) => {
-    const utilisateurId = req.params.id;
+    const utilisateurId = req.user.userId;
+
+    console.log("Utilisateur ID pour lister les templates:", utilisateurId); // Debug
   try {
     const templates = await TemplateSMS.findAll({where: { utilisateur_id: utilisateurId }});
     res.status(200).json({

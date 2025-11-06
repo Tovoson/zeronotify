@@ -1,4 +1,6 @@
+import Abonnement from "./abonnement.js";
 import Contact from "./contact.models.js";
+import Payement from "./Payement.js";
 import Sms from "./sms.models.js";
 import TemplateSMS from "./template_sms.models.js";
 import Utilisateur from "./utilisateur.models.js";
@@ -12,7 +14,6 @@ Utilisateur.hasMany(Contact, {
   },
   as: "contacts",
 });
-// PAS de Contact.belongsTo() - c'est créé automatiquement !
 
 // ========== Utilisateur <-> TemplateSMS (0 à n) ==========
 Utilisateur.hasMany(TemplateSMS, {
@@ -22,6 +23,33 @@ Utilisateur.hasMany(TemplateSMS, {
     onDelete: "CASCADE",
   },
   as: "templates",
+});
+
+Utilisateur.hasMany(Payement, {
+  foreignKey: {
+    name: "utilisateur_id",
+    allowNull: false,
+    onDelete: "CASCADE",
+  },
+  as: "payements",
+});
+
+Abonnement.hasMany(Payement, {
+  foreignKey: {
+    name: "abonnement_id",
+    allowNull: false,
+    onDelete: "CASCADE",
+  },
+  as: "payements",
+});
+
+Utilisateur.belongsTo(Abonnement, {
+  foreignKey: {
+    name: "abonnementId",
+    allowNull: false,
+    onDelete: "CASCADE",
+  },
+  as: "utilisateur_abonnement",
 });
 
 // ========== Utilisateur <-> Sms (0 à n) ==========
@@ -44,4 +72,4 @@ Contact.hasMany(Sms, {
   as: "envois",
 });
 
-export { Utilisateur, Contact, TemplateSMS, Sms };
+export { Utilisateur, Contact, TemplateSMS, Sms, Payement, Abonnement };

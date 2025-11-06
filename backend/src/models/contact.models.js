@@ -33,8 +33,8 @@ const Contact = sequelize.define("Contact", {
     defaultValue: "Client",
     validate: {
       isIn: {
-        args: [["Partenaires", "Équipe", "Fournisseurs", "Autre"]],
-        msg: "Le groupe doit être: Partenaires, Équipe, Fournisseurs, Autre",
+        args: [["Partenaires", "Client", "Équipe", "Fournisseurs", "Autre"]],
+        msg: "Le groupe doit être: Partenaires, Équipe, Client Fournisseurs, Autre",
       },
     }
   },

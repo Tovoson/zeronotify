@@ -3,18 +3,24 @@ import { ValidationError, UniqueConstraintError } from "@sequelize/core";
 import Utilisateur from "../models/utilisateur.models.js";
 import jwt from "jsonwebtoken";
 import { key_jwt } from "../lib/key_jwt.js";
+import Abonnement from "../models/abonnement.js";
 
 const signUp = async (req, res) => {
   try {
     const { nom, email, mot_de_passe, entreprise } = req.body;
 
     // Validation des champs
-    if (!nom || !email || !mot_de_passe || !entreprise) {
+    if (!nom || !email || !mot_de_passe) {
       return res.status(400).json({
         status: "fail",
         message: "Tous les champs sont requis",
       });
     }
+
+    const abonnement = await Abonnement.create({
+      quotaMessages: 10,
+      messageUtilise: 0,
+    });
 
     // Hashage du mot de passe
     const hash = await bcrypt.hash(mot_de_passe, 10);
@@ -25,6 +31,7 @@ const signUp = async (req, res) => {
       email: email,
       mot_de_passe: hash,
       entreprise: entreprise,
+      abonnementId: abonnement.id,
     });
 
     const message = "Utilisateur créé avec succès";
@@ -104,6 +111,9 @@ const login = async (req, res) => {
       key_jwt,
       { expiresIn: "24h" }
     );
+
+    console.log('Token généré:', token) // Debug
+    console.log('Payload:', jwt.decode(token))
 
     const message = "Utilisateur connecté avec succès";
     return res.json({

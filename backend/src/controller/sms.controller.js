@@ -1,20 +1,25 @@
 import Outbox from "../models/gammu/outbox.js";
-import Sms from "../models/sms.models.js"
-import { validerDatesPlanification, validerSms } from "../outils/validateur.js";
+import Sms from "../models/sms.models.js";
+import { validerDatesPlanification, validerSms, verifierQuotaSms } from "../outils/validateur.js";
 import { io } from "../app.js";
+import { verifierStatutEnvoi } from "../outils/verifierStatusEnvoi.js";
+import Utilisateur from "../models/utilisateur.models.js";
 
 /**
  * Envoyer un SMS et le stocker dans la base de données
  */
 export const send_sms = async (req, res) => {
-  const { expediteur, destinataires, contenu, utilisateurId, datePlanifiee } = req.body;
-  
-  let nouveauSms; 
-  
+  const { expediteur, destinataires, contenu, utilisateurId, datePlanifiee } =
+    req.body;
+
+  let nouveauSms;
+
   if (!Array.isArray(destinataires) || destinataires.length === 0 || !contenu) {
-    return res.status(400).json({ success: false, message: "Destinataires ou contenu invalide." });
+    return res
+      .status(400)
+      .json({ success: false, message: "Destinataires ou contenu invalide." });
   }
-  
+
   const smsValidation = validerSms(expediteur, destinataires, contenu);
   if (!smsValidation.success) {
     return res.status(400).json(smsValidation);
@@ -25,9 +30,18 @@ export const send_sms = async (req, res) => {
     return res.status(400).json(validationDate);
   }
 
+  let smsType;
+  if (destinataires.length === 1) {
+    smsType = "simple";
+  } else {
+    smsType = "groupe";
+  }
+
   try {
     const maintenant = new Date();
-    const dateEnvoiPrevue = datePlanifiee ? new Date(datePlanifiee) : maintenant;
+    const dateEnvoiPrevue = datePlanifiee
+      ? new Date(datePlanifiee)
+      : maintenant;
     const estPlanifie = dateEnvoiPrevue > maintenant;
     const statusInitial = estPlanifie ? "planifie" : "en_attente";
 
@@ -42,11 +56,11 @@ export const send_sms = async (req, res) => {
       utilisateur_id: utilisateurId,
       envoyes: 0,
       echecs: 0,
-      type: estPlanifie ? "planifie" : "groupe", 
+      type: estPlanifie ? "planifie" : smsType,
     });
 
     // ✅ SI PLANIFIÉ : Enregistrer seulement, ne pas envoyer maintenant
-    if(estPlanifie) {
+    if (estPlanifie) {
       return res.status(201).json({
         success: true,
         message: "SMS planifié avec succès.",
@@ -61,92 +75,138 @@ export const send_sms = async (req, res) => {
           contenu: {
             texte: nouveauSms.contenu,
             longueur: nouveauSms.contenu.length,
-            segments: Math.ceil(nouveauSms.contenu.length / 160)
-          }
+            segments: Math.ceil(nouveauSms.contenu.length / 160),
+          },
         },
       });
     }
 
     // ✅ ENVOI IMMÉDIAT : Insérer dans Outbox Gammu
     try {
-      
       const totalDestinataires = destinataires.length;
       let envoyesCount = 0;
       let echecsCount = 0;
 
-      io.emit('sms_envoi_debut', { 
+      const quotaActuel = await Utilisateur.findOne({
+        attributes: ['messageRestant'],
+        where: { id: utilisateurId },
+        raw: true,
+      });
+
+      const verifierQuota = verifierQuotaSms(quotaActuel.messageRestant, totalDestinataires);
+      if (!verifierQuota.success) {
+        return res.status(400).json(verifierQuota);
+      }
+
+      io.emit("sms_envoi_debut", {
         smsId: nouveauSms.id,
-        statut: 'en_cours',
+        statut: "en_cours",
         envoyes: 0,
         echecs: 0,
         totalDestinataires,
-        progression: 0
+        progression: 0,
       });
 
-      for(let i = 0; i < destinataires.length; i++) {
+      for (let i = 0; i < destinataires.length; i++) {
         const numero = String(destinataires[i]);
 
         try {
           await Outbox.create({
-            DestinationNumber: numero, 
+            DestinationNumber: numero,
             TextDecoded: contenu,
-            CreatorID: String(nouveauSms.id), 
-            Coding: 'Default_No_Compression',
-            RelativeValidity: -1, 
+            CreatorID: String(nouveauSms.id),
+            Coding: "Default_No_Compression",
+            RelativeValidity: -1,
           });
-          envoyesCount++;
 
-          nouveauSms.statut = "envoye";
-          nouveauSms.envoyes = envoyesCount;
-          nouveauSms.echecs = echecsCount;
-          nouveauSms.dateEnvoi = new Date();
-          await nouveauSms.save();
+          console.log(`✅ SMS inséré dans outbox pour ${numero}`);
 
-          io.emit('sms_envoi_progression', {
-            smsId: nouveauSms.id,
-            statut: 'en_cours',
-            envoyes: envoyesCount,
-            echecs: echecsCount,
-            total: totalDestinataires,
-            progression: Math.round((envoyesCount + echecsCount) / totalDestinataires * 100),
-            dernier_numero: numero
-          });
+          // 2️⃣ Attendre la confirmation d'envoi réel
+          const resultatEnvoi = await verifierStatutEnvoi(numero, nouveauSms.id);
+
+         if (resultatEnvoi.success) {
+            envoyesCount++;
+            console.log(`✅ SMS envoyé avec succès à ${numero} - Status: ${resultatEnvoi.data.status}`);
+
+            nouveauSms.messageRestant -= 1;
+            nouveauSms.statut = "envoye";
+            nouveauSms.envoyes = envoyesCount;
+            nouveauSms.echecs = echecsCount;
+            nouveauSms.dateEnvoi = new Date();
+            await nouveauSms.save();
+
+            io.emit("sms_envoi_progression", {
+              smsId: nouveauSms.id,
+              statut: "en_cours",
+              envoyes: envoyesCount,
+              echecs: echecsCount,
+              total: totalDestinataires,
+              progression: Math.round(
+                ((envoyesCount + echecsCount) / totalDestinataires) * 100
+              ),
+            dernier_numero: numero,
+            });
+          } else {
+             
+            echecsCount++;
+            console.error(
+              `❌ Échec confirmé pour ${numero}: ${resultatEnvoi.reason}`
+            );
+
+            await nouveauSms.update({ echecs: echecsCount });
+
+            io.emit("sms_envoi_progression", {
+              smsId: nouveauSms.id,
+              statut: "en_cours",
+              total: totalDestinataires,
+              envoyes: envoyesCount,
+              echecs: echecsCount,
+              progression: Math.round(
+                ((envoyesCount + echecsCount) / totalDestinataires) * 100
+              ),
+              dernier_echec: numero,
+              raison_echec: resultatEnvoi.reason,
+            });
+          }
         } catch (error) {
           echecsCount++;
           await nouveauSms.update({ echecs: echecsCount });
 
           console.error(`❌ Échec envoi à ${numero}:`, error.message);
-          
-          io.emit('sms_progress', {
+
+          io.emit("sms_progress", {
             smsId: nouveauSms.id,
-            statut: 'en_cours',
+            statut: "en_cours",
             total: totalDestinataires,
             envoyes: envoyesCount,
             echecs: echecsCount,
-            progression: Math.round((envoyesCount + echecsCount) / totalDestinataires * 100),
-            dernier_echec: numero
+            progression: Math.round(
+              ((envoyesCount + echecsCount) / totalDestinataires) * 100
+            ),
+            dernier_echec: numero,
           });
         }
       }
 
-      const statutFinal = echecsCount === totalDestinataires ? "echec" : "envoye";
+      const statutFinal =
+        echecsCount === totalDestinataires ? "echec" : "envoye";
       await nouveauSms.update({
         statut: statutFinal,
-        dateEnvoi: new Date()
+        dateEnvoi: new Date(),
       });
 
-      io.emit('sms_progress', {
+      io.emit("sms_progress", {
         smsId: nouveauSms.id,
-        statut: 'termine',
+        statut: "termine",
         total: totalDestinataires,
         envoyes: envoyesCount,
         echecs: echecsCount,
-        progression: 100
+        progression: 100,
       });
-      
+
       return res.status(202).json({
         success: true,
-        message: `Campagne de ${totalDestinataires} SMS soumise avec succès à Gammu pour envoi.`,
+        message: `Envoi de ${smsType} (${totalDestinataires}) SMS soumise avec succès à Gammu pour envoi.`,
         data: {
           id: nouveauSms.id,
           destinataires: nouveauSms.destinataires,
@@ -156,15 +216,12 @@ export const send_sms = async (req, res) => {
             messages_envoyes: envoyesCount,
             messages_echoues: echecsCount,
             longueur_contenu: nouveauSms.contenu.length,
-            segments_estimes: Math.ceil(nouveauSms.contenu.length / 160)
+            segments_estimes: Math.ceil(nouveauSms.contenu.length / 160),
           },
-          websocket_channel: 'sms_progress'
+          websocket_channel: "sms_progress",
         },
       });
-      
-      
     } catch (gammuError) {
-
       nouveauSms.statut = "echec";
       await nouveauSms.save();
 
@@ -192,6 +249,7 @@ export const send_sms = async (req, res) => {
 export const get_all_sms = async (req, res) => {
   try {
     const { statut, page = 1, limit = 10 } = req.query;
+    const { userId } = req.params;
 
     const offset = (page - 1) * limit;
     const whereClause = statut ? { statut } : {};
@@ -201,6 +259,7 @@ export const get_all_sms = async (req, res) => {
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [["createdAt", "DESC"]],
+      utilisateur_id: userId,
     });
 
     return res.status(200).json({

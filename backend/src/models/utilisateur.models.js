@@ -1,5 +1,6 @@
   import { sequelize } from "../config/database.js";
   import { DataTypes } from "@sequelize/core";
+import Abonnement from "./abonnement.js";
 
   const Utilisateur = sequelize.define("Utilisateur", {
   id: {
@@ -47,11 +48,24 @@
   },
   entreprise: {
     type: DataTypes.STRING,
+    allowNull: true,
+  },
+  statut: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: true,
+  },
+  messageRestant: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 10
+  },
+  abonnementId: {
+    type: DataTypes.INTEGER,
     allowNull: false,
-    validate: {
-      notEmpty: {
-        msg: "L'entreprise ne peut pas être vide",
-      },
+    references: {
+      model: Abonnement,
+      key: "id",
     },
   },
   createdAt: {

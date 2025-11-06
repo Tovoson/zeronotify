@@ -58,3 +58,19 @@ export const validerDatesPlanification = (datePlanifiee) => {
 
   return { success: true };
 };
+
+export const verifierQuotaSms = (quotaActuel, nombreSmsAAjouter) => {
+
+  if (nombreSmsAAjouter > quotaActuel) {
+    return {
+      success: false,
+      message: "Quota SMS dépassé",
+      details: {
+        quota_actuel: quotaActuel,
+        sms_a_ajouter: nombreSmsAAjouter
+      }
+    };
+  }
+
+  return { success: true };
+};
