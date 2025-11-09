@@ -1,16 +1,38 @@
 import Outbox from "../models/gammu/outbox.js";
 import Sms from "../models/sms.models.js";
-import { validerDatesPlanification, validerSms, verifierQuotaSms } from "../outils/validateur.js";
-import { io } from "../app.js";
-import { verifierStatutEnvoi } from "../outils/verifierStatusEnvoi.js";
+import {
+  validerDatesPlanification,
+  validerSms,
+  validerTableauPhones,
+} from "../outils/validateur.js";
+import {
+  getTemplateFonc,
+  preparerSMS,
+  validerDonnees,
+} from "../outils/getTemplate.js";
+import { sendSmsService } from "../services/sendSms.service.js";
 import Utilisateur from "../models/utilisateur.models.js";
 
 /**
  * Envoyer un SMS et le stocker dans la base de données
  */
 export const send_sms = async (req, res) => {
-  const { expediteur, destinataires, contenu, utilisateurId, datePlanifiee } =
+  const { expediteur, destinataires, contenu, datePlanifiee, templateId } =
     req.body;
+
+  const utilisateurId = req.user.userId;
+
+  // Vérification des numéros de téléphone
+  const resultat = validerTableauPhones(destinataires);
+  if (!resultat.success) {
+    return res.status(400).json({
+      success: false,
+      message: "Certains numéros de téléphone sont invalides",
+      details: resultat,
+    });
+  }
+
+  res.status(200).json({ success: true, data: resultat });
 
   let nouveauSms;
 
@@ -20,11 +42,13 @@ export const send_sms = async (req, res) => {
       .json({ success: false, message: "Destinataires ou contenu invalide." });
   }
 
+  // Validation des champs SMS
   const smsValidation = validerSms(expediteur, destinataires, contenu);
   if (!smsValidation.success) {
     return res.status(400).json(smsValidation);
   }
 
+  // Validation de la date de planification
   const validationDate = validerDatesPlanification(datePlanifiee);
   if (!validationDate.success) {
     return res.status(400).json(validationDate);
@@ -82,157 +106,12 @@ export const send_sms = async (req, res) => {
     }
 
     // ✅ ENVOI IMMÉDIAT : Insérer dans Outbox Gammu
-    try {
-      const totalDestinataires = destinataires.length;
-      let envoyesCount = 0;
-      let echecsCount = 0;
+    //const sendSmsResult = await sendSmsService(destinataires, contenu, utilisateurId, nouveauSms);
+    //if (sendSmsResult.status === "fail") {
+    //return res.status(500).json(sendSmsResult);
+    //}
 
-      const quotaActuel = await Utilisateur.findOne({
-        attributes: ['messageRestant'],
-        where: { id: utilisateurId },
-        raw: true,
-      });
-
-      const verifierQuota = verifierQuotaSms(quotaActuel.messageRestant, totalDestinataires);
-      if (!verifierQuota.success) {
-        return res.status(400).json(verifierQuota);
-      }
-
-      io.emit("sms_envoi_debut", {
-        smsId: nouveauSms.id,
-        statut: "en_cours",
-        envoyes: 0,
-        echecs: 0,
-        totalDestinataires,
-        progression: 0,
-      });
-
-      for (let i = 0; i < destinataires.length; i++) {
-        const numero = String(destinataires[i]);
-
-        try {
-          await Outbox.create({
-            DestinationNumber: numero,
-            TextDecoded: contenu,
-            CreatorID: String(nouveauSms.id),
-            Coding: "Default_No_Compression",
-            RelativeValidity: -1,
-          });
-
-          console.log(`✅ SMS inséré dans outbox pour ${numero}`);
-
-          // 2️⃣ Attendre la confirmation d'envoi réel
-          const resultatEnvoi = await verifierStatutEnvoi(numero, nouveauSms.id);
-
-         if (resultatEnvoi.success) {
-            envoyesCount++;
-            console.log(`✅ SMS envoyé avec succès à ${numero} - Status: ${resultatEnvoi.data.status}`);
-
-            nouveauSms.messageRestant -= 1;
-            nouveauSms.statut = "envoye";
-            nouveauSms.envoyes = envoyesCount;
-            nouveauSms.echecs = echecsCount;
-            nouveauSms.dateEnvoi = new Date();
-            await nouveauSms.save();
-
-            io.emit("sms_envoi_progression", {
-              smsId: nouveauSms.id,
-              statut: "en_cours",
-              envoyes: envoyesCount,
-              echecs: echecsCount,
-              total: totalDestinataires,
-              progression: Math.round(
-                ((envoyesCount + echecsCount) / totalDestinataires) * 100
-              ),
-            dernier_numero: numero,
-            });
-          } else {
-             
-            echecsCount++;
-            console.error(
-              `❌ Échec confirmé pour ${numero}: ${resultatEnvoi.reason}`
-            );
-
-            await nouveauSms.update({ echecs: echecsCount });
-
-            io.emit("sms_envoi_progression", {
-              smsId: nouveauSms.id,
-              statut: "en_cours",
-              total: totalDestinataires,
-              envoyes: envoyesCount,
-              echecs: echecsCount,
-              progression: Math.round(
-                ((envoyesCount + echecsCount) / totalDestinataires) * 100
-              ),
-              dernier_echec: numero,
-              raison_echec: resultatEnvoi.reason,
-            });
-          }
-        } catch (error) {
-          echecsCount++;
-          await nouveauSms.update({ echecs: echecsCount });
-
-          console.error(`❌ Échec envoi à ${numero}:`, error.message);
-
-          io.emit("sms_progress", {
-            smsId: nouveauSms.id,
-            statut: "en_cours",
-            total: totalDestinataires,
-            envoyes: envoyesCount,
-            echecs: echecsCount,
-            progression: Math.round(
-              ((envoyesCount + echecsCount) / totalDestinataires) * 100
-            ),
-            dernier_echec: numero,
-          });
-        }
-      }
-
-      const statutFinal =
-        echecsCount === totalDestinataires ? "echec" : "envoye";
-      await nouveauSms.update({
-        statut: statutFinal,
-        dateEnvoi: new Date(),
-      });
-
-      io.emit("sms_progress", {
-        smsId: nouveauSms.id,
-        statut: "termine",
-        total: totalDestinataires,
-        envoyes: envoyesCount,
-        echecs: echecsCount,
-        progression: 100,
-      });
-
-      return res.status(202).json({
-        success: true,
-        message: `Envoi de ${smsType} (${totalDestinataires}) SMS soumise avec succès à Gammu pour envoi.`,
-        data: {
-          id: nouveauSms.id,
-          destinataires: nouveauSms.destinataires,
-          statut: nouveauSms.statut,
-          metriques: {
-            total_destinataires: totalDestinataires,
-            messages_envoyes: envoyesCount,
-            messages_echoues: echecsCount,
-            longueur_contenu: nouveauSms.contenu.length,
-            segments_estimes: Math.ceil(nouveauSms.contenu.length / 160),
-          },
-          websocket_channel: "sms_progress",
-        },
-      });
-    } catch (gammuError) {
-      nouveauSms.statut = "echec";
-      await nouveauSms.save();
-
-      console.error("Erreur d'insertion Outbox (Gammu SMSD):", gammuError);
-      return res.status(500).json({
-        success: false,
-        message: "Échec de la soumission du SMS à Gammu (Erreur BDD Outbox).",
-        error: gammuError.message,
-        data: { id: nouveauSms.id, statut: nouveauSms.statut },
-      });
-    }
+    //return res.status(202).json(sendSmsResult);
   } catch (error) {
     console.error("Erreur lors de l'envoi du SMS:", error);
     return res.status(500).json({
@@ -350,3 +229,102 @@ export const get_sms_historique = async (req, res) => {
     });
   }
 };
+
+export const sendUsingTemplate = async (req, res) => {
+  const { templateId, destinataires, datePlanifiee } = req.body;
+
+  const utilisateurId = req.user.userId;
+
+  try {
+    const template = await getTemplateFonc(templateId);
+    if (template.status === "fail") {
+      return res.status(404).json(template);
+    }
+
+    const validation = validerDonnees(
+      destinataires,
+      template.data.variablesTemplate
+    );
+/* 
+    if (!validation.valide) {
+      return res.status(400).json({
+        success: false,
+        message: "Données des destinataires invalides pour le template fourni",
+        details: validation.erreurs,
+      });
+    } 
+ */
+    const messages = preparerSMS(template.data.contenuTemplate, destinataires);
+
+    if (!messages.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Erreur lors de la préparation des messages",
+        erreurs: messages.erreurs,
+      });
+    }
+
+    const maintenant = new Date();
+    const dateEnvoiPrevue = datePlanifiee
+      ? new Date(datePlanifiee)
+      : maintenant;
+    const estPlanifie = dateEnvoiPrevue > maintenant;
+    const statusInitial = estPlanifie ? "planifie" : "en_attente";
+
+    const expediteur = "zeronotify";
+    const smsCreations = messages.messages.map((msg) => {
+      return Sms.create({
+        expediteur,
+        destinataires: msg.numero,
+        contenu: msg.message,
+        statut: statusInitial,
+        dateEnvoi: null,
+        date_planifiee: estPlanifie ? dateEnvoiPrevue : null,
+        total: 1,
+        utilisateur_id: utilisateurId,
+        envoyes: 0,
+        echecs: 0,
+        type: estPlanifie ? "planifie" : "groupe",
+        templateId: templateId, // Garder trace du template utilisé
+      });
+    });
+
+    const nouveauxSms = await Promise.all(smsCreations);
+
+    const sendSmsResult = await sendSmsService(destinataires, contenu, utilisateurId, nouveauxSms);
+    if (sendSmsResult.status === "fail") {
+      return res.status(500).json(sendSmsResult);
+    }
+  } catch (error) {
+    console.error("Erreur dans sendUsingTemplate:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de l'envoi des SMS",
+      error: error.message,
+    });
+  }
+};
+
+export const getQuotaSms = async (req, res) => {
+
+  const utilisateur_id = req.user.userId;
+  try {
+
+    const quotaSms = await Utilisateur.findOne({
+      attributes: ['messageRestant'],
+      where: { id: utilisateur_id },
+      raw: true,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: quotaSms,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération du quota SMS:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Erreur lors de la récupération du quota SMS",
+    });
+  }
+  };

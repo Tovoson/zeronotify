@@ -1,16 +1,71 @@
-export const validerPhone = (destinataire) => {
-    const phoneRegex = /^\+261[0-9]{9}$/;
+const validerPhone = (destinataire) => {
+  // Nettoyer le numéro (enlever espaces)
+  let numCleaned = String(destinataire).trim();
+  
+  // Vérifier si vide
+  if (!numCleaned || numCleaned.length === 0) {
+    return {
+      success: false,
+      message: "Le numéro ne peut pas être vide",
+    };
+  }
 
-    if (!phoneRegex.test(destinataire)) {
-      return {
-        success: false,
-        message:
-          "Le numéro de téléphone doit être au format (+261XXXXXXXXX)",
-        example: "+26134XXXXXXX",
-      };
+  if (/^(3[234]|38)\d{7}$/.test(numCleaned)) {
+    numCleaned = "0" + numCleaned; // Ajouter le 0 manquant
+  }
+
+  if (/^261(3[234]|38)\d{7}$/.test(numCleaned)) {
+    numCleaned = "+" + numCleaned;
+  }
+
+  // Format international : +261XXXXXXXXX (9 chiffres après +261)
+  const regexInternational = /^\+261(3[234]|38)\d{7}$/;
+  
+  // Format local : 03X XXXXXXX (10 chiffres commençant par 03)
+  const regexLocal = /^0(3[234]|38)\d{7}$/;
+
+  const isValid = regexInternational.test(numCleaned) || regexLocal.test(numCleaned);
+
+  if (!isValid) {
+    return {
+      success: false,
+      message: "Format invalide. Utilisez +261XXXXXXXXX ou 03XXXXXXXX",
+      example: "+26134XXXXXXX ou 0341234567",
+      numero: destinataire,
+    };
+  }
+
+  return { 
+    success: true,
+    numero: numCleaned,
+  };
+};
+
+export const validerTableauPhones = (destinataires) => {
+  const resultats = {
+    valides: [],
+    invalides: [],
+    total: destinataires.length,
+  };
+
+  destinataires.forEach((dest) => {
+    const validation = validerPhone(dest);
+    
+    if (validation.success) {
+      resultats.valides.push(validation.numero);
+    } else {
+      resultats.invalides.push({
+        numero: dest,
+        raison: validation.message,
+      });
     }
+  });
 
-    return { success: true };
+  return {
+    ...resultats,
+    success: resultats.invalides.length === 0,
+    message: `${resultats.valides.length}/${resultats.total} numéros valides`,
+  };
 };
 
 export const validerSms = (expediteur, destinataire, contenu) => {

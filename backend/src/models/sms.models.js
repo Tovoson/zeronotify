@@ -80,6 +80,10 @@ const Sms = sequelize.define("Sms", {
       },
     },
   },
+  templateId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
   createdAt: {
     allowNull: false,
     type: DataTypes.DATE,

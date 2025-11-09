@@ -11,6 +11,7 @@ import templateRouter from "./routes/template.routes.js";
 import "./outils/scheduledSmsService.js";
 import http from 'http';
 import { Server } from 'socket.io';
+import { teste } from "./outils/getTemplate.js";
 
 
 dotenv.config();
@@ -43,7 +44,7 @@ app
 
 app.use(express.json());
 
-
+//teste();
 
 app.get("/", (req, res) => {
   res.status(200).json({

@@ -1,4 +1,5 @@
 import TemplateSMS from "../models/template_sms.models.js";
+import { getTemplateFonc } from "../outils/getTemplate.js";
 
 export const creerTemplate = async (req, res) => {
   try {
@@ -59,13 +60,15 @@ export const listerTemplates = async (req, res) => {
   }
 };
 
-export const getTemplateById = (req, res) => {
+export const getTemplateById = async(req, res) => {
   const { id } = req.params;
-  // Logic to get a template by ID
-  res.status(200).json({
-    status: "success",
-    data: {}, // Replace with actual template data
-  });
+
+  const result = await getTemplateFonc(id);
+  if (result.status === "fail") {
+    return res.status(404).json(result);
+  }
+
+  res.status(200).json(result);
 };
 
 export const mettreAJourTemplate = (req, res) => {
