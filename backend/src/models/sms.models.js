@@ -27,7 +27,7 @@ const Sms = sequelize.define("Sms", {
     },
   },
   contenu: {
-    type: DataTypes.TEXT,
+    type: DataTypes.JSON,
     allowNull: false,
     validate: {
       notEmpty: {

@@ -231,7 +231,13 @@ export const get_sms_historique = async (req, res) => {
 };
 
 export const sendUsingTemplate = async (req, res) => {
-  const { templateId, destinataires, datePlanifiee } = req.body;
+  const { 
+    expediteur,
+    templateId, 
+    destinataires, //destinataires est un tableau d'objets avec au moins une clé 'numero', 
+    //contenu, // Le contenu sera généré à partir du template et des données des destinataires
+    datePlanifiee 
+  } = req.body;
 
   const utilisateurId = req.user.userId;
 
@@ -245,7 +251,7 @@ export const sendUsingTemplate = async (req, res) => {
       destinataires,
       template.data.variablesTemplate
     );
-/* 
+
     if (!validation.valide) {
       return res.status(400).json({
         success: false,
@@ -253,7 +259,7 @@ export const sendUsingTemplate = async (req, res) => {
         details: validation.erreurs,
       });
     } 
- */
+
     const messages = preparerSMS(template.data.contenuTemplate, destinataires);
 
     if (!messages.success) {
@@ -263,6 +269,21 @@ export const sendUsingTemplate = async (req, res) => {
         erreurs: messages.erreurs,
       });
     }
+    
+    console.log(messages);
+
+    let arrayDestinataires = [];
+
+    for(let i = 0; i < messages.messages.length; i++){
+      arrayDestinataires.push(messages.messages[i].numero)
+    }
+
+    let arrayContenu = [];
+    for(let i = 0; i < messages.messages.length; i++){
+      arrayContenu.push(messages.messages[i].message)
+    }
+
+    console.log(arrayContenu);
 
     const maintenant = new Date();
     const dateEnvoiPrevue = datePlanifiee
@@ -271,7 +292,23 @@ export const sendUsingTemplate = async (req, res) => {
     const estPlanifie = dateEnvoiPrevue > maintenant;
     const statusInitial = estPlanifie ? "planifie" : "en_attente";
 
-    const expediteur = "zeronotify";
+    if(estPlanifie){
+      return Sms.create({
+        expediteur,
+        destinataires: arrayDestinataires,
+        contenu: arrayContenu,
+        statut: statusInitial,
+        dateEnvoi: null,
+        date_planifiee: estPlanifie ? dateEnvoiPrevue : null,
+        total: 1,
+        utilisateur_id: utilisateurId,
+        envoyes: 0,
+        echecs: 0,
+        type: estPlanifie ? "planifie" : "groupe",
+        templateId: templateId, // Garder trace du template utilisé
+      });
+    }
+
     const smsCreations = messages.messages.map((msg) => {
       return Sms.create({
         expediteur,
