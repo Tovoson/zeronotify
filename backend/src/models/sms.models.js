@@ -41,7 +41,7 @@ const Sms = sequelize.define("Sms", {
     defaultValue: "en_attente",
     validate: {
       isIn: {
-        args: [["en_attente", "envoye", "planifie", "echec"]],
+        args: [["en_attente", "envoye", "planifie", "echec", "annule"]],
         msg: "Le statut doit être: en_attente, envoye, planifie ou echec",
       },
     },
@@ -79,6 +79,11 @@ const Sms = sequelize.define("Sms", {
         msg: "Le type doit être: simple, groupe ou planifie",
       },
     },
+  },
+  isPlaned: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
   },
   templateId: {
     type: DataTypes.INTEGER,

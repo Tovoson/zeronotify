@@ -1,14 +1,62 @@
 import { io } from "../app.js";
 import Outbox from "../models/gammu/outbox.js";
+import Sms from "../models/sms.models.js";
 import Utilisateur from "../models/utilisateur.models.js";
 import { verifierQuotaSms } from "../outils/validateur.js";
+import { ajouterAFileVerification } from "./smsWorker.js";
 
-export const sendSmsService = async (destinataires, contenu, utilisateurId, nouveauSms) => {
+export const sendSmsService = async (
+  destinataires, // Array [{numero, contenu}, ...]
+  utilisateurId,
+  nouveauSms,
+  smsType
+) => {
+  const smsId = nouveauSms.id;
+  let nouveauSmsInstance = nouveauSms;
+
+  console.log("🔍 Service reçoit destinataires:", JSON.stringify(destinataires, null, 2));
+  console.log("🆔 SMS ID:", smsId, "Type:", smsType);
+
+  if (!smsId) {
+    console.error("❌ smsId indéfinie");
+    return { success: false, message: "SMS ID manquant" };
+  }
+
+  // Validation: destinataires doit être un tableau
+  if (!Array.isArray(destinataires)) {
+    console.error("❌ destinataires n'est pas un tableau:", typeof destinataires);
+    return { success: false, message: "Format de destinataires invalide" };
+  }
+
+  // Validation: chaque élément doit avoir numero et contenu
+  const elementsInvalides = destinataires.filter(d => !d || !d.numero || !d.contenu);
+  if (elementsInvalides.length > 0) {
+    console.error("❌ Éléments invalides détectés:", elementsInvalides);
+    return { 
+      success: false, 
+      message: "Certains destinataires n'ont pas de numéro ou contenu",
+      invalides: elementsInvalides
+    };
+  }
+
+  // SAFEGUARD: Assurer que l'objet est une instance Sequelize
+  if (!nouveauSmsInstance || typeof nouveauSmsInstance.update !== "function") {
+    const retrievedInstance = await Sms.findByPk(smsId);
+    if (!retrievedInstance) {
+      console.error(`❌ Instance SMS introuvable pour ID: ${smsId}`);
+      return {
+        success: false,
+        message: "Erreur interne: Instance SMS introuvable.",
+      };
+    }
+    nouveauSmsInstance = retrievedInstance;
+  }
+
   try {
     const totalDestinataires = destinataires.length;
-    let envoyesCount = 0;
-    let echecsCount = 0;
+    console.log(`📊 Total destinataires: ${totalDestinataires}`);
 
+    // Vérification du quota
     const quotaActuel = await Utilisateur.findOne({
       attributes: ["messageRestant"],
       where: { id: utilisateurId },
@@ -23,140 +71,116 @@ export const sendSmsService = async (destinataires, contenu, utilisateurId, nouv
       return { success: false, message: verifierQuota.message };
     }
 
+    // Notification début d'envoi
     io.emit("sms_envoi_debut", {
       smsId: nouveauSms.id,
       statut: "en_cours",
-      envoyes: 0,
-      echecs: 0,
       totalDestinataires,
       progression: 0,
     });
 
-    for (let i = 0; i < destinataires.length; i++) {
-      const numero = String(destinataires[i]);
+    // Envoi en mode batch
+    const batchSize = 10;
+    let soumisCount = 0;
+    let echecsInsertionCount = 0;
 
-      try {
-        await Outbox.create({
-          DestinationNumber: numero,
-          TextDecoded: contenu,
-          CreatorID: String(nouveauSms.id),
-          Coding: "Default_No_Compression",
-          RelativeValidity: -1,
-        });
+    for (let i = 0; i < destinataires.length; i += batchSize) {
+      const batch = destinataires.slice(i, i + batchSize);
+      
+      console.log(`\n📦 Traitement batch ${Math.floor(i/batchSize) + 1}: ${batch.length} destinataires`);
 
-        console.log(`✅ SMS inséré dans outbox pour ${numero}`);
+      // Traiter chaque destinataire du batch
+      for (const dest of batch) {
+        console.log(`\n➡️  Traitement de ${dest.numero}`);
+        console.log(`   Contenu: ${dest.contenu.substring(0, 50)}...`);
 
-        // 2️⃣ Attendre la confirmation d'envoi réel
-        const resultatEnvoi = await verifierStatutEnvoi(numero, nouveauSms.id);
-
-        if (resultatEnvoi.success) {
-          envoyesCount++;
-          console.log(
-            `✅ SMS envoyé avec succès à ${numero} - Status: ${resultatEnvoi.data.status}`
-          );
-
-          nouveauSms.messageRestant -= 1;
-          nouveauSms.statut = "envoye";
-          nouveauSms.envoyes = envoyesCount;
-          nouveauSms.echecs = echecsCount;
-          nouveauSms.dateEnvoi = new Date();
-          await nouveauSms.save();
-
-          io.emit("sms_envoi_progression", {
-            smsId: nouveauSms.id,
-            statut: "en_cours",
-            envoyes: envoyesCount,
-            echecs: echecsCount,
-            total: totalDestinataires,
-            progression: Math.round(
-              ((envoyesCount + echecsCount) / totalDestinataires) * 100
-            ),
-            dernier_numero: numero,
+        try {
+          // Insertion dans Outbox
+          const outboxEntry = await Outbox.create({
+            DestinationNumber: dest.numero,
+            TextDecoded: dest.contenu,
+            CreatorID: String(smsId),
+            Coding: "Default_No_Compression",
+            RelativeValidity: -1,
           });
-        } else {
-          echecsCount++;
-          console.error(
-            `❌ Échec confirmé pour ${numero}: ${resultatEnvoi.reason}`
-          );
 
-          await nouveauSms.update({ echecs: echecsCount });
+          console.log(`   ✅ Inséré dans outbox (ID: ${outboxEntry.ID})`);
+          soumisCount++;
 
-          io.emit("sms_envoi_progression", {
-            smsId: nouveauSms.id,
-            statut: "en_cours",
-            total: totalDestinataires,
-            envoyes: envoyesCount,
-            echecs: echecsCount,
-            progression: Math.round(
-              ((envoyesCount + echecsCount) / totalDestinataires) * 100
-            ),
-            dernier_echec: numero,
-            raison_echec: resultatEnvoi.reason,
+          // Ajouter à la file de vérification asynchrone
+          ajouterAFileVerification({
+            numero: dest.numero,
+            contenu: dest.contenu,
+            creatorId: smsId,
+            utilisateurId,
+            smsInstance: nouveauSmsInstance,
           });
+
+          console.log(`   ✅ Ajouté à la file de vérification`);
+
+        } catch (error) {
+          console.error(`   ❌ Échec insertion pour ${dest.numero}:`, error.message);
+          echecsInsertionCount++;
         }
-      } catch (error) {
-        echecsCount++;
-        await nouveauSms.update({ echecs: echecsCount });
+      }
 
-        console.error(`❌ Échec envoi à ${numero}:`, error.message);
+      // Émettre la progression après chaque batch
+      io.emit("sms_envoi_progression", {
+        smsId: smsId,
+        statut: "soumission_en_cours",
+        soumis: soumisCount,
+        echecs: echecsInsertionCount,
+        total: totalDestinataires,
+        progression: Math.round(((soumisCount + echecsInsertionCount) / totalDestinataires) * 100),
+      });
 
-        io.emit("sms_progress", {
-          smsId: nouveauSms.id,
-          statut: "en_cours",
-          total: totalDestinataires,
-          envoyes: envoyesCount,
-          echecs: echecsCount,
-          progression: Math.round(
-            ((envoyesCount + echecsCount) / totalDestinataires) * 100
-          ),
-          dernier_echec: numero,
-        });
+      // Petit délai entre les batchs
+      if (i + batchSize < destinataires.length) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
 
-    const statutFinal = echecsCount === totalDestinataires ? "echec" : "envoye";
-    await nouveauSms.update({
-      statut: statutFinal,
-      dateEnvoi: new Date(),
-    });
+    console.log(`\n📊 Résumé soumission:`);
+    console.log(`   Total: ${totalDestinataires}`);
+    console.log(`   Soumis: ${soumisCount}`);
+    console.log(`   Échecs insertion: ${echecsInsertionCount}`);
 
-    io.emit("sms_progress", {
-      smsId: nouveauSms.id,
-      statut: "termine",
-      total: totalDestinataires,
-      envoyes: envoyesCount,
-      echecs: echecsCount,
-      progression: 100,
+    // Mise à jour initiale du statut
+    await nouveauSmsInstance.update({
+      statut: "en_attente",
+      dateEnvoi: new Date(),
+      envoyes: 0,
+      echecs: echecsInsertionCount,
     });
 
     return {
       success: true,
-      message: `Envoi de ${smsType} (${totalDestinataires}) SMS soumise avec succès à Gammu pour envoi.`,
+      message: `${soumisCount}/${totalDestinataires} SMS soumis à Gammu. Vérification en cours...`,
       data: {
-        id: nouveauSms.id,
-        destinataires: nouveauSms.destinataires,
-        statut: nouveauSms.statut,
-        metriques: {
-          total_destinataires: totalDestinataires,
-          messages_envoyes: envoyesCount,
-          messages_echoues: echecsCount,
-          longueur_contenu: nouveauSms.contenu.length,
-          segments_estimes: Math.ceil(nouveauSms.contenu.length / 160),
-        },
-        websocket_channel: "sms_progress",
+        id: nouveauSmsInstance.id,
+        statut: "en_attente",
+        totalDestinataires,
+        soumis: soumisCount,
+        echecsInsertion: echecsInsertionCount,
       },
     };
 
   } catch (gammuError) {
-    nouveauSms.statut = "echec";
-    await nouveauSms.save();
+    console.error("❌ Erreur globale d'insertion Outbox:", gammuError);
+    
+    if (nouveauSmsInstance) {
+      try {
+        await nouveauSmsInstance.update({ statut: "echec" });
+      } catch (updateError) {
+        console.error("❌ Erreur mise à jour statut:", updateError);
+      }
+    }
 
-    console.error("Erreur d'insertion Outbox (Gammu SMSD):", gammuError);
-    return res.status(500).json({
+    return {
       success: false,
       message: "Échec de la soumission du SMS à Gammu (Erreur BDD Outbox).",
       error: gammuError.message,
-      data: { id: nouveauSms.id, statut: nouveauSms.statut },
-    });
+      data: { id: smsId, statut: "echec" },
+    };
   }
 };

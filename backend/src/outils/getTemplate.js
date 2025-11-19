@@ -1,4 +1,5 @@
 import TemplateSMS from "../models/template_sms.models.js";
+import { validerTableauPhones } from "./validateur.js";
 
 export const getTemplateFonc = async (id) => {
   const template = await TemplateSMS.findByPk(id);
@@ -47,6 +48,8 @@ export const preparerSMS = (template, destinataires) => {
     total: destinataires.length,
   };
 
+  const num = []
+
   destinataires.forEach((dest) => {
     // Vérifier que le destinataire a un numéro
     if (!dest.numero) {
@@ -56,17 +59,34 @@ export const preparerSMS = (template, destinataires) => {
       });
       return;
     }
+
     // Générer le message personnalisé
     const message = remplirTemplate(template, dest);
 
+    
+
     resultats.messages.push({
-      numero: dest.numero,
+      //numero: dest.numero,
       message: message,
       donnees: dest,
     });
+
+    num.push(dest.numero)
+
   });
+
+  const resultatPhone = validerTableauPhones(num);
+    if (!resultatPhone.success) {
+      return ({
+        success: false,
+        message: "Certains numéros de téléphone sont invalides",
+        details: resultatPhone,
+      });
+    }
+
   return {
     ...resultats,
+    resultatPhone,
     success: resultats.erreurs.length === 0,
     resume: `${resultats.messages.length}/${resultats.total} messages préparés`,
   };

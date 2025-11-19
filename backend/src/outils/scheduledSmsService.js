@@ -13,6 +13,8 @@ cron.schedule('* * * * *', async () => {
     const smsPlanifies = await Sms.findAll({
       where: {
         statut: 'planifie',
+        templateId: null,
+        isPlaned: true,
         date_planifiee: {
           [Op.lte]: maintenant
         }
@@ -69,6 +71,7 @@ cron.schedule('* * * * *', async () => {
         }
 
         sms.statut = "envoye";
+        sms.isPlaned= false,
         sms.dateEnvoi = new Date();
         sms.envoyes = envoyesCount;
         sms.echecs = echecsCount;

@@ -12,13 +12,21 @@ import {
 } from "../outils/getTemplate.js";
 import { sendSmsService } from "../services/sendSms.service.js";
 import Utilisateur from "../models/utilisateur.models.js";
+import { getStatutWorker } from "../services/smsWorker.js";
 
 /**
  * Envoyer un SMS et le stocker dans la base de données
  */
 export const send_sms = async (req, res) => {
-  const { expediteur, destinataires, contenu, datePlanifiee, templateId } =
-    req.body;
+  const { 
+    expediteur, 
+    destinataires, 
+    contenu, 
+    datePlanifiee, 
+    templateId
+   } = req.body;
+
+  console.log(expediteur, destinataires, contenu, datePlanifiee, templateId);
 
   const utilisateurId = req.user.userId;
 
@@ -32,9 +40,7 @@ export const send_sms = async (req, res) => {
     });
   }
 
-  res.status(200).json({ success: true, data: resultat });
-
-  let nouveauSms;
+  //res.status(200).json({ success: true, data: resultat });
 
   if (!Array.isArray(destinataires) || destinataires.length === 0 || !contenu) {
     return res
@@ -54,13 +60,7 @@ export const send_sms = async (req, res) => {
     return res.status(400).json(validationDate);
   }
 
-  let smsType;
-  if (destinataires.length === 1) {
-    smsType = "simple";
-  } else {
-    smsType = "groupe";
-  }
-
+  const smsType = destinataires.length === 1 ? "simple" : "groupe";
   try {
     const maintenant = new Date();
     const dateEnvoiPrevue = datePlanifiee
@@ -69,51 +69,99 @@ export const send_sms = async (req, res) => {
     const estPlanifie = dateEnvoiPrevue > maintenant;
     const statusInitial = estPlanifie ? "planifie" : "en_attente";
 
-    nouveauSms = await Sms.create({
+    // 6️⃣ Si planifié, créer UN SEUL SMS avec tous les destinataires
+    if (estPlanifie) {
+      const smsPlannifie = await Sms.create({
+        expediteur,
+        destinataires: destinataires, // Array de numéros
+        contenu: contenu, // Array de contenus
+        statut: statusInitial,
+        dateEnvoi: null,
+        date_planifiee: dateEnvoiPrevue,
+        total: destinataires.length,
+        utilisateur_id: utilisateurId,
+        envoyes: 0,
+        echecs: 0,
+        isPlaned: true,
+        type: "planifie",
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "SMS planifié avec succès",
+        data: {
+          id: smsPlannifie.id,
+          statut: smsPlannifie.statut,
+          date_planifiee: smsPlannifie.date_planifiee,
+          total: smsPlannifie.total,
+        },
+      });
+    }
+
+    const nouveauSms = await Sms.create({
       expediteur,
       destinataires: destinataires,
       contenu,
       statut: statusInitial,
       dateEnvoi: null,
       date_planifiee: estPlanifie ? datePlanifiee : null,
-      total: Array.isArray(destinataires) ? destinataires.length : 1,
+      total: destinataires.length,
       utilisateur_id: utilisateurId,
       envoyes: 0,
       echecs: 0,
-      type: estPlanifie ? "planifie" : smsType,
+      isPlaned: false,
+      type: smsType,
     });
 
-    // ✅ SI PLANIFIÉ : Enregistrer seulement, ne pas envoyer maintenant
-    if (estPlanifie) {
-      return res.status(201).json({
-        success: true,
-        message: "SMS planifié avec succès.",
-        data: {
-          id: nouveauSms.id,
-          expediteur: nouveauSms.expediteur,
-          destinataires: nouveauSms.destinataires,
-          statut: nouveauSms.statut,
-          date_creation: nouveauSms.dateCreation,
-          date_planifiee: nouveauSms.date_planifiee,
-          total_destinataires: nouveauSms.total,
-          contenu: {
-            texte: nouveauSms.contenu,
-            longueur: nouveauSms.contenu.length,
-            segments: Math.ceil(nouveauSms.contenu.length / 160),
-          },
-        },
-      });
+    console.log(`📨 SMS créé (ID: ${nouveauSms.id}) avec ${destinataires.length} destinataires`);
+    //res.status(200).json(nouveauSms);
+
+    const destinatairesAvecContenu = destinataires.map((num) => {
+      return {
+        numero: num,
+        contenu: contenu
+      }
+    })
+
+    console.log(destinatairesAvecContenu);
+
+    // 8️⃣ Appeler le service d'envoi ASYNCHRONE (une seule fois)
+    const resultat = await sendSmsService(
+      destinatairesAvecContenu, // Passer tout le tableau
+      utilisateurId,
+      nouveauSms,
+      smsType
+    );
+
+    // ✅ FIX: Vérifier si headers déjà envoyés
+    if (res.headersSent) {
+      console.warn("⚠️ Headers déjà envoyés, skip response");
+      return;
     }
 
-    // ✅ ENVOI IMMÉDIAT : Insérer dans Outbox Gammu
-    //const sendSmsResult = await sendSmsService(destinataires, contenu, utilisateurId, nouveauSms);
-    //if (sendSmsResult.status === "fail") {
-    //return res.status(500).json(sendSmsResult);
-    //}
+    // ✅ Une seule réponse
+    /* if (resultat.success) {
+      return res.status(200).json(resultat);
+    } else {
+      return res.status(400).json(resultat);
+    } */
 
-    //return res.status(202).json(sendSmsResult);
+    // 9️⃣ Retourner immédiatement (le worker gère les vérifications en arrière-plan)
+    return res.status(200).json({
+      success: true,
+      message: resultat.message,
+      data: resultat.data,
+    });
+
   } catch (error) {
     console.error("Erreur lors de l'envoi du SMS:", error);
+
+    // ✅ FIX: Vérifier si headers déjà envoyés
+    if (res.headersSent) {
+      console.warn("⚠️ Headers déjà envoyés, skip error response");
+      return;
+    }
+    
     return res.status(500).json({
       success: false,
       message: "Une erreur interne est survenue",
@@ -128,7 +176,7 @@ export const send_sms = async (req, res) => {
 export const get_all_sms = async (req, res) => {
   try {
     const { statut, page = 1, limit = 10 } = req.query;
-    const { userId } = req.params;
+    const { userId } = req.user.userId;
 
     const offset = (page - 1) * limit;
     const whereClause = statut ? { statut } : {};
@@ -231,22 +279,24 @@ export const get_sms_historique = async (req, res) => {
 };
 
 export const sendUsingTemplate = async (req, res) => {
-  const { 
+  const {
     expediteur,
-    templateId, 
-    destinataires, //destinataires est un tableau d'objets avec au moins une clé 'numero', 
-    //contenu, // Le contenu sera généré à partir du template et des données des destinataires
-    datePlanifiee 
+    templateId,
+    destinataires, // Tableau d'objets avec 'numero' + variables
+    datePlanifiee,
   } = req.body;
 
   const utilisateurId = req.user.userId;
 
   try {
+
+    // 1️⃣ Récupérer et valider le template
     const template = await getTemplateFonc(templateId);
     if (template.status === "fail") {
       return res.status(404).json(template);
     }
 
+    //2️⃣vérification des variables et textes, vérifier s'il y a un variable n'a pas dans le texte ou template
     const validation = validerDonnees(
       destinataires,
       template.data.variablesTemplate
@@ -258,8 +308,9 @@ export const sendUsingTemplate = async (req, res) => {
         message: "Données des destinataires invalides pour le template fourni",
         details: validation.erreurs,
       });
-    } 
+    }
 
+    // 3️⃣ Préparer les messages personnalisés
     const messages = preparerSMS(template.data.contenuTemplate, destinataires);
 
     if (!messages.success) {
@@ -269,22 +320,20 @@ export const sendUsingTemplate = async (req, res) => {
         erreurs: messages.erreurs,
       });
     }
-    
-    console.log(messages);
 
-    let arrayDestinataires = [];
+    console.log("Message préparé : variables ajouté dans le texte", messages);
 
-    for(let i = 0; i < messages.messages.length; i++){
-      arrayDestinataires.push(messages.messages[i].numero)
-    }
+    // 4️⃣ Construire le tableau des destinataires avec leur contenu personnalisé
+    const destinatairesAvecContenu = messages.messages.map((elementMessage, index) => {
+    return {
+        numero: messages.resultatPhone.valides[index],
+        contenu: elementMessage.message
+      };
+    });
 
-    let arrayContenu = [];
-    for(let i = 0; i < messages.messages.length; i++){
-      arrayContenu.push(messages.messages[i].message)
-    }
+  console.log(destinatairesAvecContenu);
 
-    console.log(arrayContenu);
-
+    // 5️⃣ Gérer la planification
     const maintenant = new Date();
     const dateEnvoiPrevue = datePlanifiee
       ? new Date(datePlanifiee)
@@ -292,46 +341,73 @@ export const sendUsingTemplate = async (req, res) => {
     const estPlanifie = dateEnvoiPrevue > maintenant;
     const statusInitial = estPlanifie ? "planifie" : "en_attente";
 
-    if(estPlanifie){
-      return Sms.create({
+    // 6️⃣ Si planifié, créer UN SEUL SMS avec tous les destinataires
+    if (estPlanifie) {
+      const smsPlannifie = await Sms.create({
         expediteur,
-        destinataires: arrayDestinataires,
-        contenu: arrayContenu,
+        destinataires: destinatairesAvecContenu.map((d) => d.numero), // Array de numéros
+        contenu: destinatairesAvecContenu.map((d) => d.contenu), // Array de contenus
         statut: statusInitial,
         dateEnvoi: null,
-        date_planifiee: estPlanifie ? dateEnvoiPrevue : null,
-        total: 1,
+        date_planifiee: dateEnvoiPrevue,
+        total: destinatairesAvecContenu.length,
         utilisateur_id: utilisateurId,
         envoyes: 0,
         echecs: 0,
-        type: estPlanifie ? "planifie" : "groupe",
-        templateId: templateId, // Garder trace du template utilisé
+        isPlaned: true,
+        type: "planifie",
+        templateId: templateId,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "SMS planifié avec succès",
+        data: {
+          id: smsPlannifie.id,
+          statut: smsPlannifie.statut,
+          date_planifiee: smsPlannifie.date_planifiee,
+          total: smsPlannifie.total,
+        },
       });
     }
 
-    const smsCreations = messages.messages.map((msg) => {
-      return Sms.create({
-        expediteur,
-        destinataires: msg.numero,
-        contenu: msg.message,
-        statut: statusInitial,
-        dateEnvoi: null,
-        date_planifiee: estPlanifie ? dateEnvoiPrevue : null,
-        total: 1,
-        utilisateur_id: utilisateurId,
-        envoyes: 0,
-        echecs: 0,
-        type: estPlanifie ? "planifie" : "groupe",
-        templateId: templateId, // Garder trace du template utilisé
-      });
+    // 7️⃣ ENVOI IMMÉDIAT: Créer UN SEUL SMS pour tout le groupe
+    const smsType = destinatairesAvecContenu.length === 1 ? "simple" : "groupe";
+
+    const nouveauSms = await Sms.create({
+      expediteur,
+      destinataires: destinatairesAvecContenu.map((d) => d.numero),
+      contenu: destinatairesAvecContenu.map((d) => d.contenu),
+      statut: statusInitial,
+      dateEnvoi: null,
+      date_planifiee: null,
+      total: destinatairesAvecContenu.length,
+      utilisateur_id: utilisateurId,
+      envoyes: 0,
+      echecs: 0,
+      isPlaned: false,
+      type: smsType,
+      templateId: templateId,
     });
 
-    const nouveauxSms = await Promise.all(smsCreations);
+    console.log(`📨 SMS créé (ID: ${nouveauSms.id}) avec ${destinatairesAvecContenu.length} destinataires`);
+    //res.status(200).json(nouveauSms);
 
-    const sendSmsResult = await sendSmsService(destinataires, contenu, utilisateurId, nouveauxSms);
-    if (sendSmsResult.status === "fail") {
-      return res.status(500).json(sendSmsResult);
-    }
+    // 8️⃣ Appeler le service d'envoi ASYNCHRONE (une seule fois)
+    const resultat = await sendSmsService(
+      destinatairesAvecContenu, // Passer tout le tableau
+      utilisateurId,
+      nouveauSms,
+      smsType
+    );
+
+    // 9️⃣ Retourner immédiatement (le worker gère les vérifications en arrière-plan)
+    return res.status(200).json({
+      success: true,
+      message: resultat.message,
+      data: resultat.data,
+    });
+
   } catch (error) {
     console.error("Erreur dans sendUsingTemplate:", error);
     res.status(500).json({
@@ -343,12 +419,10 @@ export const sendUsingTemplate = async (req, res) => {
 };
 
 export const getQuotaSms = async (req, res) => {
-
   const utilisateur_id = req.user.userId;
   try {
-
     const quotaSms = await Utilisateur.findOne({
-      attributes: ['messageRestant'],
+      attributes: ["messageRestant"],
       where: { id: utilisateur_id },
       raw: true,
     });
@@ -364,4 +438,48 @@ export const getQuotaSms = async (req, res) => {
       message: "Erreur lors de la récupération du quota SMS",
     });
   }
-  };
+};
+
+export const getStatusWorker = (req, res) => {
+  res.json(getStatutWorker());
+}
+
+// Dans votre sms.controller.js
+export const cancelScheduledSms = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Vérifier que le SMS existe et est planifié
+    const sms = await Sms.findByPk(id);
+    
+    if (!sms) {
+      return res.status(404).json({
+        success: false,
+        message: "SMS non trouvé"
+      });
+    }
+
+    if (sms.statut !== "planifie" && !sms.isPlaned) {
+      return res.status(400).json({
+        success: false,
+        message: "Ce SMS n'est pas planifié"
+      });
+    }
+
+    // Supprimer ou mettre à jour le statut
+    await sms.destroy();
+
+    // await sms.update({ statut: "annule", isPlaned: false }); si on veut garder l'historique
+
+    res.json({
+      success: true,
+      message: "SMS planifié annulé avec succès"
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'annulation:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de l'annulation du SMS"
+    });
+  }
+};

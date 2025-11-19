@@ -9,9 +9,10 @@ import syncDatabase from "./config/syncDatabase.js";
 import contactRouter from "./routes/contact.routes.js";
 import templateRouter from "./routes/template.routes.js";
 import "./outils/scheduledSmsService.js";
+import "./outils/scheduledSendSmsTemplate.js"
 import http from 'http';
 import { Server } from 'socket.io';
-import { teste } from "./outils/getTemplate.js";
+import {demarrerWorker} from "./services/smsWorker.js"
 
 
 dotenv.config();
@@ -70,4 +71,5 @@ app.use((req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}/`);
+  demarrerWorker();
 });
