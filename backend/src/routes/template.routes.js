@@ -1,5 +1,5 @@
 import express from "express";
-import { creerTemplate, getTemplateById, listerTemplates, mettreAJourTemplate, supprimerTemplate } from "../controller/template.controller.js";
+import { creerTemplate, getTemplateById, listerTemplates, mettreAJourTemplate, supprimerTemplate } from "../controllers/template.controller.js";
 import { protectAPI_via_Middleware_token } from "../middleware/auth.js";
 
 const router = express.Router();

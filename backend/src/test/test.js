@@ -1,7 +1,7 @@
-import Contact from "./models/contact.models.js";
-import Sms from "./models/sms.models.js";
-import TemplateSMS from "./models/template_sms.models.js";
-import Utilisateur from "./models/utilisateur.models.js";
+import Contact from "../models/contact.models.js";
+import Sms from "../models/sms.models.js";
+import TemplateSMS from "../models/template_sms.models.js";
+import Utilisateur from "../models/utilisateur.models.js";
 
 export const exempleUtilisation = async () => {
   // Créer un utilisateur avec ses contacts

@@ -5,6 +5,56 @@ import jwt from "jsonwebtoken";
 import { key_jwt } from "../lib/key_jwt.js";
 import Abonnement from "../models/abonnement.js";
 
+/**
+ * @swagger
+ * /zeronotify/auth/signup:
+ *   post:
+ *     summary: Créer un nouveau compte utilisateur
+ *     description: Inscription d'un nouvel utilisateur avec création automatique d'un abonnement
+ *     tags:
+ *       - Authentification
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - nom
+ *               - email
+ *               - mot_de_passe
+ *             properties:
+ *               nom:
+ *                 type: string
+ *                 example: Jean Dupont
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: jean.dupont@example.com
+ *               mot_de_passe:
+ *                 type: string
+ *                 format: password
+ *                 example: MonMotDePasse123
+ *               entreprise:
+ *                 type: string
+ *                 example: Ma Société SARL
+ *     responses:
+ *       201:
+ *         description: Utilisateur créé avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Erreur de validation ou email déjà utilisé
+ *       500:
+ *         description: Erreur serveur
+ */
 const signUp = async (req, res) => {
   try {
     const { nom, email, mot_de_passe, entreprise } = req.body;
@@ -62,6 +112,68 @@ const signUp = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /zeronotify/auth/login:
+ *   post:
+ *     summary: Connexion utilisateur
+ *     description: Authentifie un utilisateur et retourne un token JWT valide 24h
+ *     tags:
+ *       - Authentification
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - mot_de_passe
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: jean.dupont@example.com
+ *               mot_de_passe:
+ *                 type: string
+ *                 format: password
+ *                 example: MonMotDePasse123
+ *     responses:
+ *       200:
+ *         description: Connexion réussie
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Utilisateur connecté avec succès
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     nom:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     entreprise:
+ *                       type: string
+ *                     active:
+ *                       type: boolean
+ *                 token:
+ *                   type: string
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *       400:
+ *         description: Champs manquants
+ *       401:
+ *         description: Mot de passe incorrect
+ *       404:
+ *         description: Email n'existe pas
+ *       500:
+ *         description: Erreur serveur
+ */
 const login = async (req, res) => {
   try {
     const { email, mot_de_passe } = req.body;

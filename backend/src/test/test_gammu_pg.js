@@ -1,7 +1,7 @@
-import Outbox from "./models/gammu/outbox.js"
-import Inbox from "./models/gammu/inbox.js";
-import SentItems from "./models/gammu/sentitems.js";
-import Phones from "./models/gammu/phones.js";
+import Outbox from "../models/gammu/outbox.js"
+import Inbox from "../models/gammu/inbox.js";
+import SentItems from "../models/gammu/sentitems.js";
+import Phones from "../models/gammu/phones.js";
 
 
 const envoyerSMS = async (destinataire, message) => {

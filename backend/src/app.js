@@ -13,6 +13,10 @@ import "./outils/scheduledSendSmsTemplate.js"
 import http from 'http';
 import { Server } from 'socket.io';
 import {demarrerWorker} from "./services/smsWorker.js"
+import swaggerJSDoc from 'swagger-jsdoc'
+import swaggerUi from 'swagger-ui-express'
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 
 dotenv.config();
@@ -45,8 +49,43 @@ app
 
 app.use(express.json());
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const options = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'ZeroNotify Api',
+      version: '1.0.0'
+    },
+    servers: [
+      {
+        url: 'http://localhost:3000/'
+      }
+    ]
+  },
+  apis: [
+    path.join(__dirname, 'app.js'),
+    path.join(__dirname, 'controllers/*.js')
+  ]
+}
+
+const swaggerSpec = swaggerJSDoc(options)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+console.log('Paths trouvés:', swaggerSpec.paths)
 //teste();
 
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: This api is used to check if Get method is working or not
+ *     description: api en marche
+ *     responses:
+ *       200:
+ *         description: To test Get method
+ */
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",

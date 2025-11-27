@@ -1,5 +1,5 @@
 import express from "express";
-import { cancelScheduledSms, get_all_sms, get_sms_by_id, get_sms_historique, getQuotaSms, getStatusWorker, send_sms, sendUsingTemplate } from "../controller/sms.controller.js";
+import { cancelScheduledSms, get_all_sms, get_sms_by_id, get_sms_historique, getQuotaSms, getStatusWorker, send_sms, sendUsingTemplate } from "../controllers/sms.controller.js";
 import { protectAPI_via_Middleware_token } from "../middleware/auth.js";
 
 const router = express.Router();

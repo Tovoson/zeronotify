@@ -1,5 +1,5 @@
 import express from "express";
-import { creerCampagneContacts, listerContacts, supprimerContact, modifierContact, getContactById } from "../controller/contact.controller.js";
+import { creerCampagneContacts, listerContacts, supprimerContact, modifierContact, getContactById } from "../controllers/contact.controller.js";
 import { protectAPI_via_Middleware_token } from "../middleware/auth.js";
 
 const router = express.Router();

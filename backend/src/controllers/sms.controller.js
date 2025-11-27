@@ -15,7 +15,51 @@ import Utilisateur from "../models/utilisateur.models.js";
 import { getStatutWorker } from "../services/smsWorker.js";
 
 /**
- * Envoyer un SMS et le stocker dans la base de données
+ * @swagger
+ * /zeronotify/sms/send-sms:
+ *   post:
+ *     summary: Envoyer un SMS
+ *     description: Envoie un SMS simple ou de groupe, avec possibilité de planification
+ *     tags:
+ *       - SMS
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - expediteur
+ *               - destinataires
+ *               - contenu
+ *             properties:
+ *               expediteur:
+ *                 type: string
+ *                 example: ZeroNotify
+ *               destinataires:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["+261340000000", "+261340000001"]
+ *               contenu:
+ *                 type: string
+ *                 example: Bonjour, ceci est un message test
+ *               datePlanifiee:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2025-12-01T10:00:00Z"
+ *               templateId:
+ *                 type: integer
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: SMS envoyé ou planifié avec succès
+ *       400:
+ *         description: Données invalides (numéros, contenu, date)
+ *       500:
+ *         description: Erreur serveur
  */
 export const send_sms = async (req, res) => {
   const { 
@@ -171,7 +215,61 @@ export const send_sms = async (req, res) => {
 };
 
 /**
- * Récupérer tous les SMS
+ * @swagger
+ * /zeronotify/sms/get-all-sms:
+ *   get:
+ *     summary: Récupérer tous les SMS
+ *     description: Liste paginée des SMS avec filtrage optionnel par statut
+ *     tags:
+ *       - SMS
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: statut
+ *         schema:
+ *           type: string
+ *           enum: [en_attente, envoye, echec, planifie]
+ *         description: Filtrer par statut
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Numéro de page
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Nombre d'éléments par page
+ *     responses:
+ *       200:
+ *         description: Liste des SMS récupérée avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *       500:
+ *         description: Erreur serveur
  */
 export const get_all_sms = async (req, res) => {
   try {
@@ -210,7 +308,63 @@ export const get_all_sms = async (req, res) => {
 };
 
 /**
- * Récupérer un SMS par ID
+ * @swagger
+ * /zeronotify/sms/send-using-template:
+ *   post:
+ *     summary: Envoyer un SMS avec template
+ *     description: Envoie des SMS personnalisés en utilisant un template avec variables
+ *     tags:
+ *       - SMS
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - expediteur
+ *               - templateId
+ *               - destinataires
+ *             properties:
+ *               expediteur:
+ *                 type: string
+ *                 example: ZeroNotify
+ *               templateId:
+ *                 type: integer
+ *                 example: 1
+ *               destinataires:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     numero:
+ *                       type: string
+ *                     nom:
+ *                       type: string
+ *                     entreprise:
+ *                       type: string
+ *                 example:
+ *                   - numero: "+261340000000"
+ *                     nom: Jean
+ *                     entreprise: ABC Corp
+ *                   - numero: "+261340000001"
+ *                     nom: Marie
+ *                     entreprise: XYZ Ltd
+ *               datePlanifiee:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2025-12-01T10:00:00Z"
+ *     responses:
+ *       200:
+ *         description: SMS envoyés avec succès
+ *       400:
+ *         description: Variables invalides ou template introuvable
+ *       404:
+ *         description: Template non trouvé
+ *       500:
+ *         description: Erreur serveur
  */
 export const get_sms_by_id = async (req, res) => {
   try {
@@ -240,7 +394,33 @@ export const get_sms_by_id = async (req, res) => {
 };
 
 /**
- * Récupérer l'historique d'un SMS
+ * @swagger
+ * /zeronotify/sms/quota:
+ *   get:
+ *     summary: Récupérer le quota SMS restant
+ *     description: Retourne le nombre de SMS restants pour l'utilisateur
+ *     tags:
+ *       - SMS
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Quota récupéré avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     messageRestant:
+ *                       type: integer
+ *                       example: 150
+ *       500:
+ *         description: Erreur serveur
  */
 export const get_sms_historique = async (req, res) => {
   try {
@@ -278,6 +458,20 @@ export const get_sms_historique = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /zeronotify/sms/worker-status:
+ *   get:
+ *     summary: Statut du worker d'envoi SMS
+ *     description: Retourne l'état actuel du worker qui traite les SMS en arrière-plan
+ *     tags:
+ *       - SMS
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Statut du worker récupéré avec succès
+ */
 export const sendUsingTemplate = async (req, res) => {
   const {
     expediteur,
@@ -418,6 +612,31 @@ export const sendUsingTemplate = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /zeronotify/sms/{id}:
+ *   get:
+ *     summary: Récupérer un SMS par ID
+ *     description: Retourne les détails complets d'un SMS spécifique
+ *     tags:
+ *       - SMS
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du SMS à récupérer
+ *     responses:
+ *       200:
+ *         description: SMS trouvé avec succès
+ *       404:
+ *         description: SMS introuvable
+ *       500:
+ *         description: Erreur serveur
+ */
 export const getQuotaSms = async (req, res) => {
   const utilisateur_id = req.user.userId;
   try {
@@ -440,11 +659,62 @@ export const getQuotaSms = async (req, res) => {
   }
 };
 
+/**
+ * @swagger
+ * /zeronotify/sms/{id}/historique:
+ *   get:
+ *     summary: Récupérer l'historique d'un SMS
+ *     description: Retourne l'historique d'envoi d'un SMS (statut, dates, etc.)
+ *     tags:
+ *       - SMS
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du SMS
+ *     responses:
+ *       200:
+ *         description: Historique récupéré avec succès
+ *       404:
+ *         description: SMS introuvable
+ *       500:
+ *         description: Erreur serveur
+ */
 export const getStatusWorker = (req, res) => {
   res.json(getStatutWorker());
 }
 
-// Dans votre sms.controller.js
+/**
+ * @swagger
+ * /zeronotify/sms/cancel-scheduled/{id}:
+ *   delete:
+ *     summary: Annuler un SMS planifié
+ *     description: Annule l'envoi d'un SMS qui était planifié pour plus tard
+ *     tags:
+ *       - SMS
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du SMS planifié à annuler
+ *     responses:
+ *       200:
+ *         description: SMS planifié annulé avec succès
+ *       400:
+ *         description: Le SMS n'est pas planifié
+ *       404:
+ *         description: SMS non trouvé
+ *       500:
+ *         description: Erreur serveur
+ */
 export const cancelScheduledSms = async (req, res) => {
   try {
     const { id } = req.params;
